@@ -10,7 +10,7 @@
       "properties": {
         "port": {"type": "integer", "minimum": 1, "maximum": 65535},
         "servedModelName": {"type": "string", "minLength": 1},
-        "replicaCount": {"type": "integer", "const": 1},
+        "replicaCount": {"type": "integer", "enum": [1]},
         "image": {"$ref": "#/definitions/image"},
         "probes": {"$ref": "#/definitions/litellmProbes"},
         "existingSecret": {
@@ -28,7 +28,7 @@
       "type": "object",
       "required": ["image", "replicaCount", "port", "resources", "model", "modelCache", "deployment", "probes"],
       "properties": {
-        "replicaCount": {"type": "integer", "const": 1},
+        "replicaCount": {"type": "integer", "enum": [1]},
         "port": {"type": "integer", "minimum": 1, "maximum": 65535},
         "image": {"$ref": "#/definitions/image"},
         "resources": {
@@ -39,7 +39,7 @@
               "type": "object",
               "required": ["nvidia.com/gpu"],
               "properties": {
-                "nvidia.com/gpu": {"const": 1}
+                "nvidia.com/gpu": {"type": "integer", "enum": [1]}
               }
             }
           }
@@ -56,13 +56,7 @@
             "size": {"type": "string", "minLength": 1},
             "storageClassName": {"type": "string"},
             "mountPath": {"type": "string", "minLength": 1}
-          },
-          "allOf": [
-            {
-              "if": {"properties": {"create": {"const": false}}},
-              "then": {"properties": {"existingClaim": {"minLength": 1}}}
-            }
-          ]
+          }
         },
         "deployment": {
           "type": "object",
@@ -79,7 +73,7 @@
             "tokenizerRevision": {"type": "string"},
             "dtype": {"type": "string", "minLength": 1},
             "quantization": {"type": "string"},
-            "trustRemoteCode": {"const": false},
+            "trustRemoteCode": {"type": "boolean", "enum": [false]},
             "maxModelLen": {"type": "integer", "minimum": 1},
             "gpuMemoryUtilization": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
             "maxNumSeqs": {"type": "integer", "minimum": 1},
