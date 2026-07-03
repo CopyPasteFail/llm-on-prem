@@ -80,6 +80,13 @@ spec:
                   key: {{ .Values.litellm.existingSecret.vllmApiKeyKey }}
             - name: HF_HOME
               value: {{ .Values.vllm.model.downloadDir | quote }}
+            {{- if .Values.vllm.huggingFaceToken.secretName }}
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.vllm.huggingFaceToken.secretName }}
+                  key: {{ .Values.vllm.huggingFaceToken.secretKey }}
+            {{- end }}
           volumeMounts:
             - name: model-cache
               mountPath: {{ .Values.vllm.modelCache.mountPath }}
