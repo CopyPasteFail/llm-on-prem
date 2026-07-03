@@ -13,27 +13,29 @@ The v0.1.0 platform has one GX10, one namespace, one active GPU-serving model, a
 - It has a smaller operational footprint than a larger multi-node installation.
 - It provides the Kubernetes APIs needed by Helm, Argo CD, LiteLLM, and vLLM.
 - K3s includes an ingress option and a network-policy controller, both useful for this small internal service.
+- NVIDIA lists K3s among the validated Kubernetes platforms for GPU Operator.
 
-## GX10 GPU enablement gate
+## GX10 GPU enablement
 
 The application chart requires a Kubernetes node that exposes `nvidia.com/gpu: 1`.
 
-Do not assume that NVIDIA GPU Operator is the correct GX10 solution. NVIDIA's public GPU Operator support documentation states that the operator supports discrete GPUs and does not support embedded or integrated GPUs. The GX10 path must therefore be validated on the actual machine before it becomes a cluster prerequisite.
+NVIDIA's current GPU Operator platform-support matrix explicitly lists DGX Spark under supported Blackwell systems and supported ARM-based platforms. It also lists K3s as a validated Kubernetes distribution. The ASUS GX10 uses the same GB10 platform but is a different vendor product, so the exact GX10 operating-system, driver, container-runtime, and GPU Operator combination should be validated before the first real deployment.
 
-Validate this sequence before bootstrapping the application:
+Recommended validation sequence:
 
 1. Confirm the NVIDIA driver and `nvidia-smi` work on the GX10 host.
-2. Confirm the selected container runtime can access the GPU from an Arm64 test container.
-3. Install and validate a GX10-compatible Kubernetes GPU device-plugin path.
-4. Run a test pod that requests `nvidia.com/gpu: 1`.
-5. Run the selected vLLM image and a small model before using the main model release.
+2. Install K3s and NVIDIA GPU Operator using the supported configuration for the installed Ubuntu release.
+3. Confirm the node advertises `nvidia.com/gpu: 1`.
+4. Run a test pod that requests the GPU.
+5. Run the selected Arm64 vLLM image with a small model before using the main model release.
 
-No Kubernetes distribution changes this hardware-support validation. K3s remains appropriate for the control plane once the GPU resource is available.
+The Helm chart does not depend on GPU Operator-specific APIs. It only requires the standard `nvidia.com/gpu` resource, so the device-plugin implementation can be changed later if needed.
 
 ## Recommended profile
 
 - One K3s server on the GX10 using the embedded datastore.
 - K3s containerd runtime.
+- NVIDIA GPU Operator for driver, container toolkit, GPU device plugin, and GPU observability components.
 - Keep K3s network policy enabled unless it is deliberately replaced.
 - Use built-in Traefik only when it is the selected internal ingress controller. Otherwise disable it and install the organization-standard controller.
 - Keep Kubernetes, Argo CD, LiteLLM, and vLLM private to the corporate network or VPN.
@@ -48,4 +50,4 @@ MicroK8s can work, but it has no clear v0.1.0 advantage over K3s for this one-no
 
 ## Scope
 
-The application chart does not install K3s, the GX10 GPU device-plugin path, Argo CD, ingress, DNS, TLS, or storage provisioning. Those remain cluster prerequisites.
+The application chart does not install K3s, GPU Operator, Argo CD, ingress, DNS, TLS, or storage provisioning. Those remain cluster prerequisites.
