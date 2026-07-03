@@ -7,6 +7,10 @@ litellm:
     repository: registry.example.internal/llm/litellm
     digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
   servedModelName: company-code
+  existingSecret:
+    name: llm-serving-secrets
+    masterKeyKey: LITELLM_MASTER_KEY
+    vllmApiKeyKey: VLLM_API_KEY
 
 vllm:
   image:
@@ -28,10 +32,3 @@ vllm:
 ingress:
   host: llm.internal.example
   className: ""
-
-# The referenced Secret is created outside Git.
-litellm:
-  existingSecret:
-    name: llm-serving-secrets
-    masterKeyKey: LITELLM_MASTER_KEY
-    vllmApiKeyKey: VLLM_API_KEY
