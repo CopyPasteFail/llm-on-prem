@@ -7,14 +7,16 @@ Treat the GX10 runtime as one tested compatibility set, not as independently upg
 ```text
 Ubuntu release
 + K3s version
-+ NVIDIA GPU Operator version
++ selected GPU integration version
 + NVIDIA driver and container runtime
 + Arm64 LiteLLM image digest
 + Arm64 vLLM image digest
 + model revision and quantization
 ```
 
-A change to any of these can affect GPU availability, model loading, inference behavior, observability, or rollback.
+NVIDIA GPU Operator is the first GPU integration candidate. Record it as part of the validated set only after the GX10 acceptance gate succeeds.
+
+A change to any component can affect GPU availability, model loading, inference behavior, observability, or rollback.
 
 ## What is pinned in Git
 
@@ -31,7 +33,7 @@ Do not use mutable image tags or floating model branches in a reviewed model rel
 
 ## What is recorded outside this repository
 
-The installed operating system, K3s, GPU Operator, NVIDIA driver, and container runtime versions are host and cluster facts. Record the validated versions in the deployment change record or internal operations system after the first installation.
+Record the installed operating system, K3s, selected GPU integration, NVIDIA driver, container runtime, and validation result in the deployment change record or internal operations system after the first installation.
 
 ## Upgrade order
 
@@ -46,4 +48,4 @@ The installed operating system, K3s, GPU Operator, NVIDIA driver, and container 
 ## Rollback
 
 - For application or model changes: revert the Git commit and let Argo CD reconcile.
-- For cluster-level upgrades: use the documented K3s or GPU Operator rollback procedure for the installed version, then verify the Kubernetes GPU resource before reconciling the application again.
+- For cluster-level upgrades: use the rollback procedure for the installed K3s or selected GPU integration version, then verify the Kubernetes GPU resource before reconciling the application again.
