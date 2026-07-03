@@ -1,0 +1,105 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "llm-serving.fullname" . }}-vllm
+  namespace: {{ include "llm-serving.namespace" . }}
+  labels:
+    {{- include "llm-serving.labels" . | nindent 4 }}
+    app.kubernetes.io/component: vllm
+spec:
+  strategy:
+    type: {{ .Values.vllm.deployment.strategy }}
+  replicas: {{ .Values.vllm.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "llm-serving.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: vllm
+  template:
+    metadata:
+      labels:
+        {{- include "llm-serving.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: vllm
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "llm-serving.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.vllm.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.vllm.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.vllm.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: vllm
+          image: {{ printf "%s@%s" .Values.vllm.image.repository .Values.vllm.image.digest | quote }}
+          imagePullPolicy: {{ .Values.vllm.image.pullPolicy }}
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              exec vllm serve {{ .Values.vllm.model.id | quote }}
+              --host 0.0.0.0
+              --port {{ .Values.vllm.port }}
+              --api-key "$VLLM_API_KEY"
+              --served-model-name {{ .Values.litellm.servedModelName | quote }}
+              --revision {{ .Values.vllm.model.revision | quote }}
+              --dtype {{ .Values.vllm.model.dtype | quote }}
+              --max-model-len {{ .Values.vllm.model.maxModelLen }}
+              --gpu-memory-utilization {{ .Values.vllm.model.gpuMemoryUtilization }}
+              --max-num-seqs {{ .Values.vllm.model.maxNumSeqs }}
+              --max-num-batched-tokens {{ .Values.vllm.model.maxNumBatchedTokens }}
+              --download-dir {{ .Values.vllm.model.downloadDir | quote }}
+              {{- if .Values.vllm.model.tokenizer }} --tokenizer {{ .Values.vllm.model.tokenizer | quote }}{{- end }}
+              {{- if .Values.vllm.model.tokenizerRevision }} --tokenizer-revision {{ .Values.vllm.model.tokenizerRevision | quote }}{{- end }}
+              {{- if .Values.vllm.model.quantization }} --quantization {{ .Values.vllm.model.quantization | quote }}{{- end }}
+              {{- if .Values.vllm.model.trustRemoteCode }} --trust-remote-code{{- end }}
+              {{- range .Values.vllm.model.extraArgs }} {{ . | quote }}{{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.vllm.port }}
+              protocol: TCP
+          env:
+            - name: VLLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.litellm.existingSecret.name }}
+                  key: {{ .Values.litellm.existingSecret.vllmApiKeyKey }}
+            - name: HF_HOME
+              value: {{ .Values.vllm.model.downloadDir | quote }}
+          volumeMounts:
+            - name: model-cache
+              mountPath: {{ .Values.vllm.modelCache.mountPath }}
+          resources:
+            {{- toYaml .Values.vllm.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 15
+            failureThreshold: 20
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 6
+      volumes:
+        - name: model-cache
+          persistentVolumeClaim:
+            claimName: {{ .Values.vllm.modelCache.existingClaim }}
