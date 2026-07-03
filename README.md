@@ -1,49 +1,57 @@
 # GX10 On-Prem LLM Platform HLD
 
-A reference architecture for internal LLM workloads on an ASUS Ascent GX10, using Kubernetes, LiteLLM, vLLM, self-managed GitLab CI/CD, and observability.
+## v0.1.0
 
-## Assumptions
+A GitOps design for serving internal LLM workloads from one ASUS Ascent GX10 using Kubernetes, LiteLLM, vLLM, Helm, Argo CD, the existing on-prem GitLab, and basic observability.
 
-- One ASUS Ascent GX10 with NVIDIA GB10 Grace Blackwell
-- Internal chat, coding, and API workloads
-- Human users and non-human clients such as coding agents, GitLab CI jobs, bots, and services
-- Quotas, staging, benchmarking, monitoring, logging, and tracing
-- vLLM as the first model-serving backend
+## v0.1.0 operating model
+
+```text
+One GX10
+One Kubernetes namespace: llm-serving
+One active vLLM base model
+One stable internal API endpoint
+One Helm release
+Git is the desired state
+Argo CD reconciles Git to Kubernetes
+```
+
+The service is an internal capability alongside existing subscriptions. Model changes may cause a planned interruption while the new model loads. A Git revert is the normal rollback path.
 
 ## Core architecture
 
 ```mermaid
 flowchart LR
-    users["Employees\nChat UI, IDEs, CLI, internal apps"] --> ingress["Internal Ingress\nllm.internal.example"]
-    jobs["Coding agents, GitLab CI, bots, services"] --> ingress
-    ingress --> litellm["LiteLLM Gateway\nAuth, quotas, aliases, routing, usage"]
-    litellm --> fast["vLLM: company-fast"]
-    litellm --> code["vLLM: company-code"]
-    litellm --> large["vLLM: company-large"]
-    fast --> gx10["ASUS Ascent GX10\nNVIDIA GB10"]
-    code --> gx10
-    large --> gx10
+    users["Employees\nChat UI, IDEs, CLI, internal apps"] --> ingress["Internal ingress\nllm.internal.example"]
+    automation["Coding agents, GitLab CI jobs, bots, services"] --> ingress
+
+    ingress --> litellm["LiteLLM\nAuth, API keys, quotas,\ncompany-code alias, usage"]
+    litellm --> vllm["vLLM\nOne active model release"]
+    vllm --> gx10["ASUS Ascent GX10\nNVIDIA GB10"]
+
+    gitlab["Existing on-prem GitLab\nSource code, chart, CI, registry"] --> argocd["Argo CD\nGitOps reconciliation"]
+    argocd --> cluster["Kubernetes\nllm-serving namespace"]
+    cluster --> litellm
+    cluster --> vllm
+
     litellm --> obs["Metrics, logs, traces"]
-    fast --> obs
-    code --> obs
-    large --> obs
+    vllm --> obs
 ```
 
-## First-version components
+## Responsibilities
 
-| Area | Component | Purpose |
+| Area | Component | Responsibility |
 |---|---|---|
-| LLM gateway | LiteLLM | Internal OpenAI-compatible API, auth, quotas, routing, usage tracking |
-| Model serving | vLLM | Load and serve LLMs on the GX10 |
-| Runtime | Kubernetes | Deployment, isolation, rollout control, staging/prod separation |
-| GPU stack | NVIDIA GPU Operator | GPU drivers, device plugin, DCGM metrics |
-| CI/CD | Self-managed GitLab + GitLab Runner | Candidate deployment, benchmarks, production promotion |
-| Metrics | Prometheus | Metrics storage |
-| Dashboards | Grafana | Platform, model, and GPU dashboards |
-| Logs | Loki + Alloy/Promtail | Centralized logs |
-| Tracing | OpenTelemetry Collector + Tempo or Jaeger | Request tracing |
-| Chat UI | Open WebUI or LibreChat | Internal chat interface |
-| Coding tools | Continue, Aider, OpenHands, compatible CLI agents | Developer workflows |
+| Source of truth | Git repository in the existing GitLab | Helm chart, environment values, model release definition, deployment history |
+| CI | Existing GitLab CI and runners | Validate chart changes; build and publish an immutable image only when custom deployment code changes |
+| CD / GitOps | Argo CD | Render the Helm chart and reconcile the Git revision into Kubernetes |
+| Runtime | Kubernetes | Run LiteLLM and one GPU-backed vLLM deployment |
+| LLM gateway | LiteLLM | Stable OpenAI-compatible API, identity, quotas, routing, usage |
+| Model serving | vLLM | Load and serve the active model on the GX10 |
+| GPU stack | NVIDIA GPU Operator | Driver, device plugin, and GPU metrics |
+| Observability | Prometheus, Grafana, logs, optional tracing | Service and host visibility |
+
+GitLab CI does not run direct `helm upgrade` commands against the cluster in this design. Argo CD is the only application deployer.
 
 ## Stable API
 
@@ -52,17 +60,46 @@ https://llm.internal.example/v1
 POST /v1/chat/completions
 ```
 
-Clients select approved aliases such as `company-code`. vLLM remains private inside the cluster.
+Clients use a stable alias:
+
+```json
+{
+  "model": "company-code",
+  "messages": [
+    { "role": "user", "content": "Explain this function" }
+  ]
+}
+```
+
+A model replacement changes the pinned release behind `company-code`; clients keep the same endpoint and alias.
+
+## Model release workflow
+
+```text
+Change model release values in Git
+→ GitLab CI validates the chart and rendered manifests
+→ merge the approved change
+→ Argo CD synchronizes the Helm release
+→ Kubernetes replaces the active vLLM pod
+→ smoke test and user evaluation
+→ retain the commit or revert it
+```
+
+The active vLLM Deployment uses `Recreate` so the previous GPU-serving pod stops before the replacement starts.
+
+## Versioning
+
+- Helm chart version: `0.1.0`
+- Deployment package app version: `0.1.0`
+- vLLM image: immutable digest
+- Model: exact repository revision and quantization settings in Git
+
+The chart version changes when templates or chart behavior change. A model-only change updates the GX10 values file and keeps the chart version unchanged.
 
 ## Documents
 
 - [Architecture](docs/architecture.md)
 - [Kubernetes layout](docs/kubernetes.md)
+- [GitOps v0.1.0](docs/gitops.md)
 - [GitLab CI/CD](docs/gitlab-ci-cd.md)
 - [Quotas and identity](docs/quotas-and-identity.md)
-
-## Design stance
-
-```text
-LiteLLM -> vLLM -> GX10
-```
