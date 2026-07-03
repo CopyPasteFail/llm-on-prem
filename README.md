@@ -1,53 +1,71 @@
-# On-Prem LLM Platform HLD
+# GX10 Local LLM Serving HLD
 
-A high-level reference architecture for serving internal LLM workloads from an on-prem GPU server, using Kubernetes, LiteLLM, vLLM, Jenkins, and a basic observability stack.
+A high-level design for serving internal LLM workloads from one **ASUS Ascent GX10** AI workstation, using an on-prem GitLab instance, LiteLLM, a GPU-backed serving runtime, Docker Compose, and lightweight observability.
 
-The scenario assumes:
+This design deliberately replaces the earlier H200, Kubernetes, and Jenkins assumptions.
 
-- One or more NVIDIA GPU servers, for example an H200 server
-- Internal users need chat, coding assistance, and API access
-- Some workloads are human-driven
-- Some workloads are non-human, such as coding agents, CI jobs, bots, and backend services
-- The platform should include quotas, staging, benchmarking, monitoring, logging, and basic tracing
-- Version 1 should stay simple and use vLLM as the model-serving backend
+## Scope and assumptions
+
+The initial host is one GX10 with:
+
+- NVIDIA GB10 Grace Blackwell platform
+- Arm64 Linux environment
+- 128 GB unified memory
+- 1 TB NVMe storage
+- 10 GbE networking
+
+The design assumes internal users need chat, coding assistance, and API access, while non-human clients include coding agents, GitLab CI jobs, bots, and internal services.
+
+Before implementation, validate that the selected serving runtime, container images, model architecture, CUDA stack, and required developer tools support **Linux Arm64 on the GX10**. The API and deployment structure should remain usable even if the preferred runtime changes.
+
+## Design stance
+
+Version 1 is a **single-host platform**, not a cluster.
+
+Use:
+
+```text
+Internal clients -> HTTPS reverse proxy -> LiteLLM -> GPU serving runtime -> GX10
+```
+
+Use Docker Compose for deployment. Do not introduce Kubernetes or a distributed inference stack until the single-host design has a demonstrated limitation.
+
+A single GX10 does not provide high availability, true environment isolation, or capacity for production and GPU-heavy staging workloads at the same time. Staging is therefore a controlled candidate deployment or benchmark window on the same host, not a separate production-equivalent environment.
 
 ## Core architecture
 
 ```mermaid
 flowchart LR
-    users["Employees\nChat UI, IDEs, CLI, internal apps"] --> ingress["Internal Ingress\nllm.internal.example"]
-    agents["Non-human clients\nCoding agents, Jenkins, bots, services"] --> ingress
+    people["Employees\nChat UI, IDEs, CLI, internal apps"] --> proxy["HTTPS reverse proxy\nllm.internal.example"]
+    automation["Non-human clients\nGitLab CI, coding agents, bots, services"] --> proxy
 
-    ingress --> litellm["LiteLLM Gateway\nAuth, API keys, quotas,\nmodel aliases, routing, usage"]
-    litellm --> vllm_fast["vLLM: company-fast"]
-    litellm --> vllm_code["vLLM: company-code"]
-    litellm --> vllm_large["vLLM: company-large"]
+    proxy --> gateway["LiteLLM gateway\nAuth, keys, quotas, model aliases, usage"]
+    gateway --> runtime["GPU serving runtime\nInitial candidate: vLLM, Arm64 validated"]
+    runtime --> gx10["ASUS Ascent GX10\nNVIDIA GB10, 128 GB unified memory"]
 
-    vllm_fast --> gpu["H200 GPU Server"]
-    vllm_code --> gpu
-    vllm_large --> gpu
+    gateway --> telemetry["Metrics, logs, traces"]
+    runtime --> telemetry
 
-    litellm --> obs["Observability\nMetrics, logs, traces"]
-    vllm_fast --> obs
-    vllm_code --> obs
-    vllm_large --> obs
+    gitlab["Self-managed GitLab\nRepo, registry, CI/CD"] --> runner["GitLab Runner\nBuild, validate, deploy"]
+    runner --> gateway
+    runner --> runtime
 ```
 
 ## First-version component list
 
 | Area | Component | Purpose |
 |---|---|---|
-| LLM gateway | LiteLLM | One internal OpenAI-compatible API surface, auth, quotas, routing, usage tracking |
-| Model serving | vLLM | Load and serve LLMs on GPU |
-| Runtime | Kubernetes | Deployment, isolation, rollout control, staging/prod separation |
-| GPU stack | NVIDIA GPU Operator | Kubernetes GPU drivers, device plugin, DCGM metrics |
-| CI/CD | Jenkins | Deploy candidates to staging, run benchmarks, promote to production |
-| Metrics | Prometheus | Scrape and store metrics |
-| Dashboards | Grafana | Dashboards for platform, model, and GPU health |
-| Logs | Loki + Alloy/Promtail | Centralized logs |
-| Tracing | OpenTelemetry Collector + Tempo or Jaeger | Request flow tracing and latency breakdown |
-| Chat UI | Open WebUI or LibreChat | Internal chat interface |
-| Coding tools | Continue, Aider, OpenHands, compatible CLI agents | Developer-facing coding workflows |
+| Host | ASUS Ascent GX10 | Single Arm64 GPU-serving host |
+| Runtime | Docker Engine + Docker Compose | Reproducible single-host deployment |
+| LLM gateway | LiteLLM | One OpenAI-compatible API, identity, quotas, routing, and usage tracking |
+| Model serving | GPU serving runtime | Load and serve models. Start with vLLM only after GX10 compatibility validation. |
+| Edge | Caddy, NGINX, or equivalent | Internal TLS, request limits, and a single public internal route |
+| Source control and CI/CD | Self-managed GitLab + GitLab Runner | Source control, container registry, pipeline validation, controlled deployment |
+| Metrics | Prometheus + Grafana | Service, host, and GPU health |
+| Logs | Container logs, optionally Loki + Alloy | Operational logs and troubleshooting |
+| Tracing | OpenTelemetry, optional in V1 | Latency breakdown when needed |
+| Chat UI | Open WebUI or LibreChat | Internal interactive interface |
+| Coding tools | Continue, Aider, OpenHands, compatible CLI agents | Developer-facing workflows |
 
 ## Stable API design
 
@@ -74,26 +92,33 @@ Clients select a model alias in the request:
 }
 ```
 
-Do not expose vLLM directly to users or tools. vLLM should stay private inside the cluster.
+Do not expose the serving runtime directly to users or tools. Only LiteLLM should be reachable through the internal reverse proxy.
 
-## Recommended docs
+## Model aliases
 
-- [Architecture](docs/architecture.md)
-- [Kubernetes layout](docs/kubernetes.md)
-- [Quotas and identity](docs/quotas-and-identity.md)
-- [Observability and tracing](docs/observability.md)
-- [Staging, benchmarks, and coding-agent evals](docs/staging-and-evals.md)
-- [Frontend and coding-agent options](docs/frontend-and-agents.md)
-- [Operational notes](docs/operations.md)
-
-## Design stance
-
-Version 1 should avoid unnecessary complexity.
-
-Use:
+Aliases allow model replacement without changing client configuration:
 
 ```text
-LiteLLM -> vLLM -> H200
+company-fast
+company-code
+company-large
+company-candidate
 ```
 
-Do not start with a heavier optimized inference stack unless benchmarks prove it is needed.
+An alias is a product contract, not a guarantee that every named model can run concurrently on one GX10. Capacity and latency must be benchmarked before enabling an alias for broad use.
+
+## Recommended documents
+
+- [Architecture](docs/architecture.md)
+- [Single-host deployment](docs/deployment.md)
+- [GitLab CI/CD](docs/gitlab-ci-cd.md)
+- [Quotas and identity](docs/quotas-and-identity.md)
+
+## Non-goals for version 1
+
+- Kubernetes
+- Multi-node or multi-GX10 serving
+- High availability or automatic failover
+- Running production and GPU-heavy staging workloads simultaneously
+- Direct public internet exposure
+- A custom inference gateway or custom scheduler
