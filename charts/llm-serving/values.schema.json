@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "llm-serving values",
+  "type": "object",
+  "required": ["litellm", "vllm", "ingress"],
+  "properties": {
+    "litellm": {
+      "type": "object",
+      "required": ["image", "port", "servedModelName", "existingSecret"],
+      "properties": {
+        "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+        "servedModelName": {"type": "string", "minLength": 1},
+        "replicaCount": {"type": "integer", "const": 1},
+        "image": {"$ref": "#/definitions/image"},
+        "existingSecret": {
+          "type": "object",
+          "required": ["name", "masterKeyKey", "vllmApiKeyKey"],
+          "properties": {
+            "name": {"type": "string", "minLength": 1},
+            "masterKeyKey": {"type": "string", "minLength": 1},
+            "vllmApiKeyKey": {"type": "string", "minLength": 1}
+          }
+        }
+      }
+    },
+    "vllm": {
+      "type": "object",
+      "required": ["image", "replicaCount", "port", "resources", "model", "modelCache", "deployment"],
+      "properties": {
+        "replicaCount": {"type": "integer", "const": 1},
+        "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+        "image": {"$ref": "#/definitions/image"},
+        "resources": {"type": "object"},
+        "modelCache": {
+          "type": "object",
+          "required": ["existingClaim", "mountPath"],
+          "properties": {
+            "existingClaim": {"type": "string", "minLength": 1},
+            "mountPath": {"type": "string", "minLength": 1}
+          }
+        },
+        "deployment": {
+          "type": "object",
+          "required": ["strategy"],
+          "properties": {"strategy": {"type": "string", "enum": ["Recreate"]}}
+        },
+        "model": {
+          "type": "object",
+          "required": ["id", "revision", "dtype", "maxModelLen", "gpuMemoryUtilization", "maxNumSeqs", "maxNumBatchedTokens", "downloadDir"],
+          "properties": {
+            "id": {"type": "string", "minLength": 1},
+            "revision": {"type": "string", "minLength": 1},
+            "tokenizer": {"type": "string"},
+            "tokenizerRevision": {"type": "string"},
+            "dtype": {"type": "string", "minLength": 1},
+            "quantization": {"type": "string"},
+            "trustRemoteCode": {"type": "boolean"},
+            "maxModelLen": {"type": "integer", "minimum": 1},
+            "gpuMemoryUtilization": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
+            "maxNumSeqs": {"type": "integer", "minimum": 1},
+            "maxNumBatchedTokens": {"type": "integer", "minimum": 1},
+            "downloadDir": {"type": "string", "minLength": 1},
+            "extraArgs": {"type": "array", "items": {"type": "string"}}
+          }
+        }
+      }
+    },
+    "ingress": {
+      "type": "object",
+      "required": ["enabled", "host"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "host": {"type": "string", "minLength": 1}
+      }
+    }
+  },
+  "definitions": {
+    "image": {
+      "type": "object",
+      "required": ["repository", "digest", "pullPolicy"],
+      "properties": {
+        "repository": {"type": "string", "minLength": 1},
+        "digest": {"type": "string", "pattern": "^sha256:[a-fA-F0-9]{64}$"},
+        "pullPolicy": {"type": "string", "enum": ["Always", "IfNotPresent", "Never"]}
+      }
+    }
+  }
+}
