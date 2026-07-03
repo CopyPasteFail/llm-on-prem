@@ -102,4 +102,4 @@ spec:
       volumes:
         - name: model-cache
           persistentVolumeClaim:
-            claimName: {{ .Values.vllm.modelCache.existingClaim }}
+            claimName: {{ include "llm-serving.modelCacheClaimName" . }}
