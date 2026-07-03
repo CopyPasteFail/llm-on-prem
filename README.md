@@ -75,9 +75,10 @@ The chart and validation scripts enforce these v0.1.0 invariants:
 2. Validate K3s and the GX10 GPU resource path.
 3. Replace placeholders in `charts/llm-serving/values/gx10.yaml` with tested images, an exact model revision, benchmarked capacity settings, and the internal hostname.
 4. Run `sh scripts/validate-helm.sh`.
-5. Create the real `llm-serving-secrets` Secret outside Git.
-6. Bootstrap the Argo CD project and application templates.
-7. Verify synchronization and run `sh scripts/smoke-api.sh` from an approved internal environment.
+5. Run `sh scripts/check-release-ready.sh`.
+6. Create the real `llm-serving-secrets` Secret outside Git.
+7. Bootstrap the Argo CD project and application templates.
+8. Verify synchronization and run `sh scripts/smoke-api.sh` from an approved internal environment.
 
 ## Model release workflow
 
@@ -94,6 +95,7 @@ Review values/gx10.yaml
 ## Documents
 
 - [Deployment runbook](docs/deployment-runbook.md)
+- [Release readiness gate](docs/release-readiness.md)
 - [Acceptance checklist](docs/acceptance-checklist.md)
 - [Bootstrap runbook](docs/bootstrap.md)
 - [Compatibility and upgrades](docs/compatibility-and-upgrades.md)
