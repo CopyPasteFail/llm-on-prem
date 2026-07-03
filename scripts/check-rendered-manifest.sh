@@ -11,7 +11,7 @@ test -s "$manifest" || {
 require() {
   pattern="$1"
   description="$2"
-  if ! grep -Eq "$pattern" "$manifest"; then
+  if ! grep -Eq -- "$pattern" "$manifest"; then
     echo "ERROR: expected ${description}" >&2
     exit 1
   fi
@@ -20,7 +20,7 @@ require() {
 forbid() {
   pattern="$1"
   description="$2"
-  if grep -Eq "$pattern" "$manifest"; then
+  if grep -Eq -- "$pattern" "$manifest"; then
     echo "ERROR: forbidden ${description}" >&2
     exit 1
   fi
@@ -37,9 +37,9 @@ require 'kind: Ingress' 'the internal ingress'
 require 'path: /health/readiness' 'the LiteLLM readiness probe'
 require 'path: /health/liveliness' 'the LiteLLM liveness probe'
 require 'startupProbe:' 'the vLLM startup probe'
-forbid -- '--trust-remote-code' 'vLLM trust-remote-code flag'
+forbid '--trust-remote-code' 'vLLM trust-remote-code flag'
 
-if grep -Eq 'REPLACE_WITH_|registry\.example\.internal' "$manifest"; then
+if grep -Eq -- 'REPLACE_WITH_|registry\.example\.internal' "$manifest"; then
   echo "WARNING: rendered manifest still contains example release values." >&2
 fi
 
