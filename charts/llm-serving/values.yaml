@@ -1,5 +1,5 @@
-# Safe chart defaults. Copy values/gx10.example.yaml to the ignored
-# values/gx10.yaml and replace every REPLACE_* value before deployment.
+# Safe chart defaults. The tracked GX10 values file overrides the release-specific
+# model and immutable image references before the first intentional deployment.
 
 nameOverride: ""
 fullnameOverride: ""
@@ -83,7 +83,13 @@ vllm:
     downloadDir: /models/huggingface
     extraArgs: []
   modelCache:
-    existingClaim: llm-model-cache
+    create: true
+    claimName: llm-model-cache
+    existingClaim: ""
+    accessModes:
+      - ReadWriteOnce
+    size: 500Gi
+    storageClassName: ""
     mountPath: /models
   deployment:
     strategy: Recreate
