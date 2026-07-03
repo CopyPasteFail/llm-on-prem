@@ -5,6 +5,8 @@
 {{- define "llm-serving.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
+{{- else if contains (include "llm-serving.name" .) .Release.Name }}
+{{- .Release.Name | trunc 63 | trimSuffix "-" }}
 {{- else }}
 {{- printf "%s-%s" .Release.Name (include "llm-serving.name" .) | trunc 63 | trimSuffix "-" }}
 {{- end }}
