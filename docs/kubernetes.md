@@ -1,74 +1,133 @@
-# Single-Host Deployment
+# Kubernetes Layout
 
-This file keeps its historical path, but the version-1 design does **not** use Kubernetes. It defines the GX10 deployment shape instead.
+## Namespaces
 
-## Host model
+```mermaid
+flowchart TB
+    cluster["Kubernetes cluster"] --> prod["llm-prod"]
+    cluster --> staging["llm-staging"]
+    cluster --> obs["llm-observability"]
+    cluster --> gpu["gpu-operator namespace"]
 
-Run the platform on one ASUS Ascent GX10 using Linux on Arm64, Docker Engine, and Docker Compose.
+    prod --> prod_litellm["LiteLLM prod"]
+    prod --> prod_vllm["vLLM prod models on GX10"]
 
-Validate the selected serving runtime, container image, NVIDIA container integration, driver stack, and model architecture on the GX10 before enabling internal users.
+    staging --> stg_litellm["LiteLLM staging"]
+    staging --> stg_vllm["Candidate vLLM models on GX10"]
+    staging --> jobs["Benchmark Jobs"]
 
-## Services
+    obs --> prom["Prometheus"]
+    obs --> grafana["Grafana"]
+    obs --> loki["Loki"]
+    obs --> otel["OpenTelemetry Collector"]
+    obs --> tempo["Tempo / Jaeger"]
+```
+
+Recommended namespaces:
+
+```text
+llm-prod
+llm-staging
+llm-observability
+```
+
+The NVIDIA GPU Operator may use its own namespace, depending on installation style.
+
+## Kubernetes objects
+
+### Production
+
+Use:
+
+- `Deployment`: LiteLLM
+- `Service`: LiteLLM
+- `Ingress`: internal route, for example `llm.internal.example`
+- `ConfigMap`: LiteLLM model routing config
+- `Secret`: credentials and service keys
+- `Deployment`: each vLLM model server
+- `Service`: each vLLM model server
+- `PVC`: model storage, if models are stored locally
+- `NetworkPolicy`: only LiteLLM can call vLLM
+- `ResourceQuota`: prevent accidental namespace overuse
+- `ServiceAccount`, `Role`, `RoleBinding`: scoped permissions
+
+### Staging
+
+Use:
+
+- `Deployment`: LiteLLM staging
+- `Service`: LiteLLM staging
+- `Ingress`: `llm-staging.internal.example`
+- `Deployment`: candidate vLLM model server
+- `Service`: candidate vLLM model server
+- `Job`: one-off benchmark run
+- `CronJob`: scheduled regression benchmark
+- `Secret`: staging-only API keys
+- `NetworkPolicy`: keep staging isolated from production
+
+### Observability
+
+Use:
+
+- `Prometheus`
+- `Grafana`
+- `Loki`
+- `Grafana Alloy` or `Promtail`
+- `OpenTelemetry Collector`
+- `Tempo` or `Jaeger`
+- `kube-state-metrics`
+- `node-exporter`
+- `DCGM Exporter`
+
+## Deployment vs StatefulSet
+
+Use `Deployment` for LiteLLM.
+
+Use `Deployment` for vLLM in version 1.
+
+A `StatefulSet` is only needed if:
+
+- Each replica needs stable identity
+- Each pod owns separate persistent storage
+- You run a more complex distributed serving setup
+- Stable pod-to-storage mapping matters
+
+For a first version on one GX10, `Deployment` is simpler and sufficient.
+
+## GPU scheduling
+
+A vLLM pod requests the GX10 GPU with:
+
+```yaml
+resources:
+  limits:
+    nvidia.com/gpu: 1
+```
+
+The NVIDIA GPU Operator and device plugin make that resource available to Kubernetes.
+
+## Internal service routing
 
 ```mermaid
 flowchart LR
-    client["Internal client"] --> proxy["HTTPS reverse proxy"]
-    proxy --> litellm["LiteLLM\nGateway and quotas"]
-    litellm --> runtime["GPU serving runtime\nOne active workload"]
-    runtime --> gx10["GX10 GPU platform"]
-    litellm --> telemetry["Metrics and logs"]
-    runtime --> telemetry
+    client["Client"] --> ingress["Ingress\nllm.internal.example"]
+    ingress --> svc_litellm["Service\nlitellm-proxy"]
+    svc_litellm --> pod_litellm["Deployment pods\nlitellm-proxy"]
+    pod_litellm --> svc_vllm["Service\nvllm-company-code"]
+    svc_vllm --> pod_vllm["Deployment pod\nvllm-company-code"]
+    pod_vllm --> gx10["ASUS Ascent GX10\nNVIDIA GB10"]
 ```
 
-| Service | Version 1 | Purpose |
-|---|---:|---|
-| Reverse proxy | Required | TLS and internal access boundary |
-| LiteLLM | Required | Stable API, aliases, limits, and usage |
-| GPU serving runtime | Required | Model loading and inference |
-| Prometheus and Grafana | Optional | Health and performance dashboards |
-| Loki and Alloy | Optional | Centralized logs |
-
-The serving runtime uses a private Compose network and must not publish a host port. Only the reverse proxy accepts client traffic.
-
-## Persistent host layout
+Internal vLLM service name example:
 
 ```text
-/srv/llm/
-  compose.yaml
-  env/production.env
-  config/
-  data/models/
-  data/runtime-cache/
-  data/litellm/
-  logs/
+http://vllm-company-code.llm-prod.svc.cluster.local:8000/v1
 ```
 
-Keep secrets, model weights, certificates, and production environment files out of Git.
+Clients should call:
 
-## Capacity rules
+```text
+https://llm.internal.example/v1/chat/completions
+```
 
-The GX10 uses unified memory. The operating system, CPU workloads, GPU workloads, model weights, context cache, and batching compete for one pool.
-
-- Start with one active serving model.
-- Set context and concurrency limits from a benchmark.
-- Treat any second loaded model as an explicit capacity decision.
-- Run GPU-heavy benchmarks in a maintenance window or after draining normal traffic.
-- Remove unused model revisions and container images because the 1 TB NVMe disk can fill quickly.
-
-## Candidate testing
-
-There is no production-equivalent staging environment on one host. Use one controlled approach:
-
-1. Drain or pause normal traffic, run a candidate test, then restore production.
-2. Expose a restricted `company-candidate` alias only when measured capacity allows it.
-3. Run an offline benchmark without a public gateway route.
-
-The first approach is the safest default.
-
-## Networking and recovery
-
-- Use a stable internal DNS name or reserved DHCP address.
-- Keep management access restricted to administrators through the corporate network or VPN.
-- Do not expose the API, the LiteLLM administration surface, or the serving runtime to the public internet.
-- Back up durable configuration and service state.
-- A host, driver, storage, or runtime failure is an outage until the single host is restored.
+not the vLLM service directly.
