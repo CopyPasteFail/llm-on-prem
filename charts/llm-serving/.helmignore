@@ -3,4 +3,3 @@
 .gitignore
 *.tgz
 *.tmp
-values/gx10.yaml
