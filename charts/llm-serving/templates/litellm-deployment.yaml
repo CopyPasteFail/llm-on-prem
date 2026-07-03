@@ -73,15 +73,18 @@ spec:
           securityContext:
             {{- toYaml .Values.containerSecurityContext | nindent 12 }}
           readinessProbe:
-            tcpSocket:
+            httpGet:
+              path: /health/readiness
               port: http
-            initialDelaySeconds: 5
-            periodSeconds: 10
+            periodSeconds: {{ .Values.litellm.probes.readiness.periodSeconds }}
+            failureThreshold: {{ .Values.litellm.probes.readiness.failureThreshold }}
           livenessProbe:
-            tcpSocket:
+            httpGet:
+              path: /health/liveliness
               port: http
-            initialDelaySeconds: 15
-            periodSeconds: 20
+            initialDelaySeconds: {{ .Values.litellm.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.litellm.probes.liveness.periodSeconds }}
+            failureThreshold: {{ .Values.litellm.probes.liveness.failureThreshold }}
       volumes:
         - name: config
           configMap:
