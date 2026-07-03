@@ -31,7 +31,7 @@ Model release values are intentionally kept in Git. Credentials remain outside G
 Run before opening a merge request:
 
 ```bash
-./scripts/validate-helm.sh
+sh scripts/validate-helm.sh
 ```
 
 This only runs Helm lint and renders manifests to `rendered/`. It does not contact a cluster.
@@ -63,7 +63,7 @@ After the intentional first sync:
 ```bash
 kubectl -n llm-serving get pods,svc,ingress,pvc
 kubectl -n llm-serving get deployment llm-serving-vllm
-./scripts/smoke-api.sh
+sh scripts/smoke-api.sh
 ```
 
 The smoke script requires an endpoint and LiteLLM API key supplied through the local environment. It does not change cluster state.
