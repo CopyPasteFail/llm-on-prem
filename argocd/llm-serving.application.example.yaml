@@ -1,5 +1,5 @@
 # Copy to argocd/llm-serving.application.yaml, set repoURL and targetRevision,
-# then apply once to bootstrap Argo CD management of this release.
+# then apply after the llm-serving AppProject is created.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -8,7 +8,7 @@ metadata:
   labels:
     app.kubernetes.io/part-of: llm-serving
 spec:
-  project: default
+  project: llm-serving
   source:
     repoURL: https://gitlab.example.internal/platform/llm-serving.git
     targetRevision: main
