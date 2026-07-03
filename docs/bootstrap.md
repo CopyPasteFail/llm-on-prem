@@ -7,7 +7,7 @@ This runbook prepares the repository for its first intentional deployment. It do
 Before bootstrapping the application, provide these cluster prerequisites outside this chart:
 
 - A Kubernetes cluster with one GX10 node.
-- NVIDIA GPU Operator installed and the node advertising `nvidia.com/gpu: 1`.
+- A validated GX10 driver, container runtime, and Kubernetes device-plugin path that exposes `nvidia.com/gpu: 1`.
 - An ingress controller and internal DNS/TLS arrangement.
 - Argo CD installed in its own namespace.
 - A storage class that can dynamically provision the chart-managed model-cache PVC. Alternatively, set `vllm.modelCache.create: false` and provide an existing claim.
