@@ -32,7 +32,7 @@ See [ADR-0001: One Active vLLM Model for v0.1.0](docs/decisions/0001-v0.1.0-one-
 
 The branch includes a Helm chart, tracked GX10 values, a validation-only GitLab CI file, an Argo CD Application bootstrap template, local validation and smoke-test scripts, and operator documentation.
 
-Nothing in this repository has been deployed. Before the first intentional deployment, replace the placeholder image digests and model revision in `charts/llm-serving/values/gx10.yaml`, create the real external Secret, and bootstrap the Argo CD Application with the existing internal GitLab repository URL.
+Nothing in this repository has been deployed. Before the first intentional deployment, replace the placeholder image digests and model revision in `charts/llm-serving/values/gx10.yaml`, create the real external Secret, validate a GX10-compatible Kubernetes GPU resource path, and bootstrap the Argo CD Application with the existing internal GitLab repository URL.
 
 ## Core architecture
 
@@ -64,7 +64,7 @@ flowchart LR
 | Runtime | Kubernetes | Run LiteLLM and one GPU-backed vLLM deployment |
 | LLM gateway | LiteLLM | Stable OpenAI-compatible API, identity, quotas, routing, usage |
 | Model serving | vLLM | Load and serve the active model on the GX10 |
-| GPU stack | NVIDIA GPU Operator | Driver, device plugin, and GPU metrics |
+| GPU integration | Validated GX10 driver, container runtime, and device-plugin path | Expose `nvidia.com/gpu: 1` to Kubernetes before application deployment |
 | Observability | Prometheus, Grafana, logs, optional tracing | Service and host visibility |
 
 GitLab CI does not run direct `helm upgrade` commands against the cluster in this design. Argo CD is the only application deployer.
