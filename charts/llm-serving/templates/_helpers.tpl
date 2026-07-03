@@ -44,3 +44,19 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- required "vllm.modelCache.existingClaim is required when modelCache.create is false" .Values.vllm.modelCache.existingClaim }}
 {{- end }}
 {{- end }}
+
+{{- define "llm-serving.validate" -}}
+{{- if ne (int .Values.vllm.replicaCount) 1 }}
+{{- fail "v0.1.0 requires vllm.replicaCount: 1" }}
+{{- end }}
+{{- if ne .Values.vllm.deployment.strategy "Recreate" }}
+{{- fail "v0.1.0 requires vllm.deployment.strategy: Recreate" }}
+{{- end }}
+{{- $gpuLimit := index .Values.vllm.resources.limits "nvidia.com/gpu" }}
+{{- if ne (toString $gpuLimit) "1" }}
+{{- fail "v0.1.0 requires vllm.resources.limits.nvidia.com/gpu: 1" }}
+{{- end }}
+{{- if .Values.vllm.model.trustRemoteCode }}
+{{- fail "v0.1.0 does not permit trustRemoteCode: true" }}
+{{- end }}
+{{- end }}
