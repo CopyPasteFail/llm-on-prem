@@ -115,7 +115,9 @@ The chart version changes when templates or chart behavior change. A model-only 
 ## Documents
 
 - [Implementation overview](docs/implementation.md)
+- [Acceptance checklist](docs/acceptance-checklist.md)
 - [Bootstrap runbook](docs/bootstrap.md)
+- [Compatibility and upgrades](docs/compatibility-and-upgrades.md)
 - [Kubernetes distribution](docs/kubernetes-distribution.md)
 - [Secret handling](docs/secrets.md)
 - [Model release workflow](docs/model-release.md)
@@ -123,5 +125,6 @@ The chart version changes when templates or chart behavior change. A model-only 
 - [Kubernetes layout](docs/kubernetes.md)
 - [GitOps v0.1.0](docs/gitops.md)
 - [ADR-0001: One Active vLLM Model](docs/decisions/0001-v0.1.0-one-active-model.md)
+- [ADR-0002: K3s and GPU Operator](docs/decisions/0002-k3s-and-gpu-operator.md)
 - [GitLab CI/CD](docs/gitlab-ci-cd.md)
 - [Quotas and identity](docs/quotas-and-identity.md)
