@@ -51,11 +51,11 @@ docs/
 apiVersion: v2
 name: llm-serving
 version: 0.1.0
-appVersion: 0.1.0
+appVersion: "0.1.0"
 ```
 
-- `version` changes when the chart templates, schema, dependencies, or deployment behavior change.
-- `appVersion` identifies the v0.1.0 deployment package.
+- `version` is the chart release marker. It changes when templates, schema, dependencies, or deployment behavior change.
+- `appVersion` is informational. For v0.1.0 it records the first application-bundle version.
 - A model-only replacement changes `values/gx10.yaml`, not the chart version.
 - Container images use immutable digests. Do not use a mutable `latest` tag for a release.
 
