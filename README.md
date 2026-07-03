@@ -1,130 +1,107 @@
-# GX10 On-Prem LLM Platform HLD
+# GX10 On-Prem LLM Platform
 
 ## v0.1.0
 
-A GitOps design and repository scaffold for serving internal LLM workloads from one ASUS Ascent GX10 using Kubernetes, LiteLLM, vLLM, Helm, Argo CD, the existing on-prem GitLab, and basic observability.
-
-## v0.1.0 operating model
+A GitOps repository scaffold for an internal LLM service on one ASUS Ascent GX10.
 
 ```text
-One GX10
-One Kubernetes namespace: llm-serving
-One active vLLM base model
-One stable internal API endpoint
-One Helm release
-Git is the desired state
-Argo CD reconciles Git to Kubernetes
+K3s
+→ validated Kubernetes GPU resource
+→ Argo CD
+→ Helm release in llm-serving
+→ LiteLLM
+→ one private vLLM pod
+→ one active model on the GX10
 ```
 
-The service is an internal capability alongside existing subscriptions. Model changes may cause a planned interruption while the new model loads. A Git revert is the normal rollback path.
+## Implemented v0.1.0 scope
 
-## Why one active model
+- One Kubernetes namespace: `llm-serving`.
+- One active vLLM base model and one GPU request: `nvidia.com/gpu: 1`.
+- One stable internal endpoint and model alias: `company-code`.
+- One LiteLLM gateway credential for a small trusted internal pilot.
+- Helm as the application definition and Argo CD as the only application deployer.
+- Existing on-prem GitLab for source control and validation-only CI.
+- Git-based model replacement and rollback using the Kubernetes `Recreate` strategy.
 
-Version 0.1.0 deliberately serves one GPU-backed base model at a time. It does not require GPU time-slicing, CUDA MPS, MIG, or a permanently active staging model.
+## Deliberately not implemented in v0.1.0
 
-This keeps the single-GX10 service predictable and easier to operate: the active model has the full GPU, there is no multi-model resource contention to manage, and production behavior is simpler to benchmark, observe, secure, and troubleshoot. The trade-off is accepted because planned interruption during model evaluation or rollback is acceptable for this internal service.
+- Parallel production and staging models.
+- GPU time-slicing, CUDA MPS, or MIG.
+- Zero-downtime model swaps.
+- Individual users, SSO, virtual keys, persistent usage accounting, or per-user quotas.
+- GitLab jobs that deploy directly to Kubernetes.
+- Container-image builds in this repository.
 
-New models are tested by replacing the active model through the GitOps workflow. The stable LiteLLM endpoint and `company-code` alias remain unchanged. A Git revert restores the previous known-good model release.
+## GX10 and Kubernetes decision
 
-See [ADR-0001: One Active vLLM Model for v0.1.0](docs/decisions/0001-v0.1.0-one-active-model.md) for the full decision and revisit conditions.
+K3s is the selected Kubernetes distribution for this single-node design.
 
-## Repository scaffold
+NVIDIA GPU Operator is the first GX10 GPU integration candidate. NVIDIA's support documentation lists DGX Spark and K3s, but it also includes a separate discrete-GPU limitation and does not name ASUS GX10. Do not treat GPU Operator as confirmed GX10 support until the actual machine exposes `nvidia.com/gpu: 1` and passes an Arm64 GPU workload and small-vLLM-model test.
 
-The branch includes a Helm chart, tracked GX10 values, a validation-only GitLab CI file, an Argo CD Application bootstrap template, local validation and smoke-test scripts, and operator documentation.
+The application chart depends only on the standard Kubernetes GPU resource. It does not use GPU Operator custom resources.
 
-Nothing in this repository has been deployed. Before the first intentional deployment, replace the placeholder image digests and model revision in `charts/llm-serving/values/gx10.yaml`, create the real external Secret, validate a GX10-compatible Kubernetes GPU resource path, and bootstrap the Argo CD Application with the existing internal GitLab repository URL.
-
-## Core architecture
+## Architecture
 
 ```mermaid
 flowchart LR
-    users["Employees\nChat UI, IDEs, CLI, internal apps"] --> ingress["Internal ingress\nllm.internal.example"]
-    automation["Coding agents, GitLab CI jobs, bots, services"] --> ingress
+    client["Internal clients"] --> ingress["Internal ingress"]
+    ingress --> gateway["LiteLLM\ncompany-code"]
+    gateway --> serving["private vLLM Service"]
+    serving --> pod["one vLLM pod"]
+    pod --> gx10["GX10 GPU"]
 
-    ingress --> litellm["LiteLLM\nAuth, API keys, quotas,\ncompany-code alias, usage"]
-    litellm --> vllm["vLLM\nOne active model release"]
-    vllm --> gx10["ASUS Ascent GX10\nNVIDIA GB10"]
-
-    gitlab["Existing on-prem GitLab\nSource code, chart, CI, registry"] --> argocd["Argo CD\nGitOps reconciliation"]
-    argocd --> cluster["Kubernetes\nllm-serving namespace"]
-    cluster --> litellm
-    cluster --> vllm
-
-    litellm --> obs["Metrics, logs, traces"]
-    vllm --> obs
+    gitlab["Existing GitLab\nsource + validation CI"] --> argo["Argo CD"]
+    argo --> release["Helm release\nllm-serving"]
+    release --> gateway
+    release --> pod
 ```
 
-## Responsibilities
+## Repository guardrails
 
-| Area | Component | Responsibility |
-|---|---|---|
-| Source of truth | Git repository in the existing GitLab | Helm chart, environment values, model release definition, deployment history |
-| CI | Existing GitLab CI and runners | Validate chart changes; build and publish an immutable image only when custom deployment code changes |
-| CD / GitOps | Argo CD | Render the Helm chart and reconcile the Git revision into Kubernetes |
-| Runtime | Kubernetes | Run LiteLLM and one GPU-backed vLLM deployment |
-| LLM gateway | LiteLLM | Stable OpenAI-compatible API, identity, quotas, routing, usage |
-| Model serving | vLLM | Load and serve the active model on the GX10 |
-| GPU integration | Validated GX10 driver, container runtime, and device-plugin path | Expose `nvidia.com/gpu: 1` to Kubernetes before application deployment |
-| Observability | Prometheus, Grafana, logs, optional tracing | Service and host visibility |
+The chart and validation scripts enforce these v0.1.0 invariants:
 
-GitLab CI does not run direct `helm upgrade` commands against the cluster in this design. Argo CD is the only application deployer.
+- vLLM replica count is `1`.
+- vLLM deployment strategy is `Recreate`.
+- GPU limit is `nvidia.com/gpu: 1`.
+- `trustRemoteCode` must remain `false`.
+- Model and container images are pinned by immutable references in tracked desired state.
+- vLLM has no public ingress route.
+- Secret and RBAC resources are excluded from the Argo CD application project.
 
-## Stable API
+## Before first deployment
 
-```text
-https://llm.internal.example/v1
-POST /v1/chat/completions
-```
-
-Clients use a stable alias:
-
-```json
-{
-  "model": "company-code",
-  "messages": [
-    { "role": "user", "content": "Explain this function" }
-  ]
-}
-```
-
-A model replacement changes the pinned release behind `company-code`; clients keep the same endpoint and alias.
+1. Push the reviewed repository to the internal GitLab project and protected deployment branch.
+2. Validate K3s and the GX10 GPU resource path.
+3. Replace placeholders in `charts/llm-serving/values/gx10.yaml` with tested images, an exact model revision, benchmarked capacity settings, and the internal hostname.
+4. Run `sh scripts/validate-helm.sh`.
+5. Create the real `llm-serving-secrets` Secret outside Git.
+6. Bootstrap the Argo CD project and application templates.
+7. Verify synchronization and run `sh scripts/smoke-api.sh` from an approved internal environment.
 
 ## Model release workflow
 
 ```text
-Change model release values in Git
-→ GitLab CI validates the chart and rendered manifests
-→ merge the approved change
-→ Argo CD synchronizes the Helm release
-→ Kubernetes replaces the active vLLM pod
-→ smoke test and user evaluation
-→ retain the commit or revert it
+Review values/gx10.yaml
+→ GitLab validates the chart and rendered manifest
+→ merge approved change
+→ Argo CD reconciles
+→ Kubernetes stops the old vLLM pod and loads the replacement
+→ run smoke test
+→ retain or revert the Git commit
 ```
-
-The active vLLM Deployment uses `Recreate` so the previous GPU-serving pod stops before the replacement starts.
-
-## Versioning
-
-- Helm chart version: `0.1.0`
-- Deployment package app version: `0.1.0`
-- vLLM image: immutable digest
-- Model: exact repository revision and quantization settings in Git
-
-The chart version changes when templates or chart behavior change. A model-only change updates the GX10 values file and keeps the chart version unchanged.
 
 ## Documents
 
-- [Implementation overview](docs/implementation.md)
+- [Deployment runbook](docs/deployment-runbook.md)
 - [Acceptance checklist](docs/acceptance-checklist.md)
 - [Bootstrap runbook](docs/bootstrap.md)
 - [Compatibility and upgrades](docs/compatibility-and-upgrades.md)
 - [Kubernetes distribution](docs/kubernetes-distribution.md)
-- [Secret handling](docs/secrets.md)
-- [Model release workflow](docs/model-release.md)
-- [Architecture](docs/architecture.md)
 - [Kubernetes layout](docs/kubernetes.md)
 - [GitOps v0.1.0](docs/gitops.md)
+- [Secret handling](docs/secrets.md)
+- [Quotas and identity scope](docs/quotas-and-identity.md)
+- [Model release workflow](docs/model-release.md)
 - [ADR-0001: One Active vLLM Model](docs/decisions/0001-v0.1.0-one-active-model.md)
-- [ADR-0002: K3s and GPU Operator](docs/decisions/0002-k3s-and-gpu-operator.md)
-- [GitLab CI/CD](docs/gitlab-ci-cd.md)
-- [Quotas and identity](docs/quotas-and-identity.md)
+- [ADR-0002: K3s and GX10 GPU Enablement](docs/decisions/0002-k3s-and-gpu-operator.md)
