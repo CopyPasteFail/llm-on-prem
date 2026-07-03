@@ -18,5 +18,12 @@ spec:
   namespaceResourceWhitelist:
     - group: "*"
       kind: "*"
+  namespaceResourceBlacklist:
+    - group: ""
+      kind: Secret
+    - group: rbac.authorization.k8s.io
+      kind: Role
+    - group: rbac.authorization.k8s.io
+      kind: RoleBinding
   orphanedResources:
     warn: true
