@@ -12,16 +12,16 @@ workflow:
 
 variables:
   CHART_DIR: charts/llm-serving
-  EXAMPLE_VALUES: charts/llm-serving/values/gx10.example.yaml
+  GX10_VALUES: charts/llm-serving/values/gx10.yaml
 
 helm_validate:
   stage: validate
   image: alpine/helm:3.17.3
   interruptible: true
   script:
-    - helm lint "$CHART_DIR" --values "$EXAMPLE_VALUES"
+    - helm lint "$CHART_DIR" --values "$GX10_VALUES"
     - mkdir -p rendered
-    - helm template llm-serving "$CHART_DIR" --namespace llm-serving --values "$EXAMPLE_VALUES" > rendered/llm-serving.yaml
+    - helm template llm-serving "$CHART_DIR" --namespace llm-serving --values "$GX10_VALUES" > rendered/llm-serving.yaml
     - test -s rendered/llm-serving.yaml
   artifacts:
     when: always
