@@ -1,0 +1,36 @@
+# Copy to argocd/llm-serving.application.yaml, set repoURL and targetRevision,
+# then apply once to bootstrap Argo CD management of this release.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: llm-serving
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: llm-serving
+spec:
+  project: default
+  source:
+    repoURL: https://gitlab.example.internal/platform/llm-serving.git
+    targetRevision: main
+    path: charts/llm-serving
+    helm:
+      releaseName: llm-serving
+      valueFiles:
+        - values/gx10.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: llm-serving
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
