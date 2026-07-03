@@ -13,6 +13,8 @@ These manifests are examples only. They are not active until copied, configured,
 
 The Application is restricted to the `llm-serving` AppProject. It may read only the configured repository and deploy only to `llm-serving` on the in-cluster destination.
 
+The project blocks the application from managing Kubernetes Secrets and RBAC Role or RoleBinding resources. Those are platform-managed boundaries and must not be introduced by the application chart.
+
 ## Sync behavior
 
 - Automated sync is enabled after bootstrap.
