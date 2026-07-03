@@ -41,7 +41,7 @@ The chart creates the model-cache PVC by default. Set `vllm.modelCache.create: f
 
 ## Prerequisites
 
-Kubernetes, GPU Operator, storage provisioner, ingress, internal DNS/TLS, Argo CD, Argo repository access, GitLab, runners, and real Secret values remain outside this chart.
+Kubernetes, a validated GX10 driver and Kubernetes GPU device-plugin path, storage provisioner, ingress, internal DNS/TLS, Argo CD, Argo repository access, GitLab, runners, and real Secret values remain outside this chart.
 
 ## Argo CD bootstrap
 
