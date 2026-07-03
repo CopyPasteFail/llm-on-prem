@@ -30,7 +30,7 @@ Argo CD becomes the only application deployer.
 
 ## First synchronization
 
-Confirm the application is synchronized and healthy, the model-cache PVC is bound, LiteLLM is internal-only through the ingress, and vLLM has one ready pod.
+Confirm the application is synchronized and healthy, the model-cache PVC is bound, external access follows the intended internal ingress path, and vLLM has one ready pod with no external route.
 
 ## API check
 
