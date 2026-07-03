@@ -87,18 +87,22 @@ spec:
             {{- toYaml .Values.vllm.resources | nindent 12 }}
           securityContext:
             {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          startupProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: {{ .Values.vllm.probes.startup.periodSeconds }}
+            failureThreshold: {{ .Values.vllm.probes.startup.failureThreshold }}
           readinessProbe:
             tcpSocket:
               port: http
-            initialDelaySeconds: 15
-            periodSeconds: 15
-            failureThreshold: 20
+            periodSeconds: {{ .Values.vllm.probes.readiness.periodSeconds }}
+            failureThreshold: {{ .Values.vllm.probes.readiness.failureThreshold }}
           livenessProbe:
             tcpSocket:
               port: http
-            initialDelaySeconds: 60
-            periodSeconds: 30
-            failureThreshold: 6
+            initialDelaySeconds: {{ .Values.vllm.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.vllm.probes.liveness.periodSeconds }}
+            failureThreshold: {{ .Values.vllm.probes.liveness.failureThreshold }}
       volumes:
         - name: model-cache
           persistentVolumeClaim:
