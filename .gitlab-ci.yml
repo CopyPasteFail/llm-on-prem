@@ -18,6 +18,7 @@ helm_validate:
     entrypoint: [""]
   interruptible: true
   script:
+    - sh scripts/check-gitops-layout.sh
     - helm lint "$CHART_DIR" --values "$GX10_VALUES"
     - mkdir -p rendered
     - helm template llm-serving "$CHART_DIR" --namespace llm-serving --values "$GX10_VALUES" > rendered/llm-serving.yaml
