@@ -18,6 +18,16 @@ Argo CD reconciles Git to Kubernetes
 
 The service is an internal capability alongside existing subscriptions. Model changes may cause a planned interruption while the new model loads. A Git revert is the normal rollback path.
 
+## Why one active model
+
+Version 0.1.0 deliberately serves one GPU-backed base model at a time. It does not require GPU time-slicing, CUDA MPS, MIG, or a permanently active staging model.
+
+This keeps the single-GX10 service predictable and easier to operate: the active model has the full GPU, there is no multi-model resource contention to manage, and production behavior is simpler to benchmark, observe, secure, and troubleshoot. The trade-off is accepted because planned interruption during model evaluation or rollback is acceptable for this internal service.
+
+New models are tested by replacing the active model through the GitOps workflow. The stable LiteLLM endpoint and `company-code` alias remain unchanged. A Git revert restores the previous known-good model release.
+
+See [ADR-0001: One Active vLLM Model for v0.1.0](docs/decisions/0001-v0.1.0-one-active-model.md) for the full decision and revisit conditions.
+
 ## Core architecture
 
 ```mermaid
@@ -101,5 +111,6 @@ The chart version changes when templates or chart behavior change. A model-only 
 - [Architecture](docs/architecture.md)
 - [Kubernetes layout](docs/kubernetes.md)
 - [GitOps v0.1.0](docs/gitops.md)
+- [ADR-0001: One Active vLLM Model](docs/decisions/0001-v0.1.0-one-active-model.md)
 - [GitLab CI/CD](docs/gitlab-ci-cd.md)
 - [Quotas and identity](docs/quotas-and-identity.md)
