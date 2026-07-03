@@ -2,7 +2,7 @@
 
 ## v0.1.0
 
-A GitOps design for serving internal LLM workloads from one ASUS Ascent GX10 using Kubernetes, LiteLLM, vLLM, Helm, Argo CD, the existing on-prem GitLab, and basic observability.
+A GitOps design and repository scaffold for serving internal LLM workloads from one ASUS Ascent GX10 using Kubernetes, LiteLLM, vLLM, Helm, Argo CD, the existing on-prem GitLab, and basic observability.
 
 ## v0.1.0 operating model
 
@@ -27,6 +27,12 @@ This keeps the single-GX10 service predictable and easier to operate: the active
 New models are tested by replacing the active model through the GitOps workflow. The stable LiteLLM endpoint and `company-code` alias remain unchanged. A Git revert restores the previous known-good model release.
 
 See [ADR-0001: One Active vLLM Model for v0.1.0](docs/decisions/0001-v0.1.0-one-active-model.md) for the full decision and revisit conditions.
+
+## Repository scaffold
+
+The branch includes a Helm chart, tracked GX10 values, a validation-only GitLab CI file, an Argo CD Application bootstrap template, local validation and smoke-test scripts, and operator documentation.
+
+Nothing in this repository has been deployed. Before the first intentional deployment, replace the placeholder image digests and model revision in `charts/llm-serving/values/gx10.yaml`, create the real external Secret, and bootstrap the Argo CD Application with the existing internal GitLab repository URL.
 
 ## Core architecture
 
@@ -108,6 +114,11 @@ The chart version changes when templates or chart behavior change. A model-only 
 
 ## Documents
 
+- [Implementation overview](docs/implementation.md)
+- [Bootstrap runbook](docs/bootstrap.md)
+- [Kubernetes distribution](docs/kubernetes-distribution.md)
+- [Secret handling](docs/secrets.md)
+- [Model release workflow](docs/model-release.md)
 - [Architecture](docs/architecture.md)
 - [Kubernetes layout](docs/kubernetes.md)
 - [GitOps v0.1.0](docs/gitops.md)
