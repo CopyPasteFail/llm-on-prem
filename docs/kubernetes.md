@@ -1,102 +1,49 @@
 # Kubernetes Layout
 
-## Namespaces
+## v0.1.0 namespace
+
+Use one namespace:
+
+```text
+llm-serving
+```
+
+The namespace contains the application release for one GX10 and one active model. The NVIDIA GPU Operator, Argo CD, ingress controller, and cluster-level monitoring are platform prerequisites outside this application namespace.
+
+## Application objects
 
 ```mermaid
 flowchart TB
-    cluster["Kubernetes cluster"] --> prod["llm-prod"]
-    cluster --> staging["llm-staging"]
-    cluster --> obs["llm-observability"]
-    cluster --> gpu["gpu-operator namespace"]
+    ns["llm-serving namespace"] --> ingress["Ingress\nllm.internal.example"]
+    ns --> litellm["LiteLLM Deployment and Service"]
+    ns --> vllm["vLLM Deployment and Service\nOne active model"]
+    ns --> cache["Existing model-cache PVC"]
+    ns --> config["ConfigMaps and Secret references"]
+    ns --> policy["NetworkPolicy"]
+    ns --> monitor["Monitoring integration"]
 
-    prod --> prod_litellm["LiteLLM prod"]
-    prod --> prod_vllm["vLLM prod models on GX10"]
-
-    staging --> stg_litellm["LiteLLM staging"]
-    staging --> stg_vllm["Candidate vLLM models on GX10"]
-    staging --> jobs["Benchmark Jobs"]
-
-    obs --> prom["Prometheus"]
-    obs --> grafana["Grafana"]
-    obs --> loki["Loki"]
-    obs --> otel["OpenTelemetry Collector"]
-    obs --> tempo["Tempo / Jaeger"]
+    ingress --> litellm
+    litellm --> vllm
+    vllm --> gx10["GX10 GPU\nnvidia.com/gpu: 1"]
+    vllm --> cache
 ```
 
-Recommended namespaces:
+The Helm chart renders:
 
-```text
-llm-prod
-llm-staging
-llm-observability
-```
-
-The NVIDIA GPU Operator may use its own namespace, depending on installation style.
-
-## Kubernetes objects
-
-### Production
-
-Use:
-
-- `Deployment`: LiteLLM
-- `Service`: LiteLLM
-- `Ingress`: internal route, for example `llm.internal.example`
-- `ConfigMap`: LiteLLM model routing config
-- `Secret`: credentials and service keys
-- `Deployment`: each vLLM model server
-- `Service`: each vLLM model server
-- `PVC`: model storage, if models are stored locally
-- `NetworkPolicy`: only LiteLLM can call vLLM
-- `ResourceQuota`: prevent accidental namespace overuse
-- `ServiceAccount`, `Role`, `RoleBinding`: scoped permissions
-
-### Staging
-
-Use:
-
-- `Deployment`: LiteLLM staging
-- `Service`: LiteLLM staging
-- `Ingress`: `llm-staging.internal.example`
-- `Deployment`: candidate vLLM model server
-- `Service`: candidate vLLM model server
-- `Job`: one-off benchmark run
-- `CronJob`: scheduled regression benchmark
-- `Secret`: staging-only API keys
-- `NetworkPolicy`: keep staging isolated from production
-
-### Observability
-
-Use:
-
-- `Prometheus`
-- `Grafana`
-- `Loki`
-- `Grafana Alloy` or `Promtail`
-- `OpenTelemetry Collector`
-- `Tempo` or `Jaeger`
-- `kube-state-metrics`
-- `node-exporter`
-- `DCGM Exporter`
-
-## Deployment vs StatefulSet
-
-Use `Deployment` for LiteLLM.
-
-Use `Deployment` for vLLM in version 1.
-
-A `StatefulSet` is only needed if:
-
-- Each replica needs stable identity
-- Each pod owns separate persistent storage
-- You run a more complex distributed serving setup
-- Stable pod-to-storage mapping matters
-
-For a first version on one GX10, `Deployment` is simpler and sufficient.
+- LiteLLM `Deployment` and `Service`
+- vLLM `Deployment` and private `Service`
+- internal `Ingress`
+- LiteLLM and vLLM `ConfigMaps`
+- references to pre-created secrets
+- model-cache `PersistentVolumeClaim` reference
+- `NetworkPolicy`
+- `ServiceAccount`, `Role`, and `RoleBinding` where needed
+- resource requests and limits
+- monitoring annotations or `ServiceMonitor` when available
 
 ## GPU scheduling
 
-A vLLM pod requests the GX10 GPU with:
+The vLLM Deployment requests the full GX10 GPU:
 
 ```yaml
 resources:
@@ -104,30 +51,45 @@ resources:
     nvidia.com/gpu: 1
 ```
 
-The NVIDIA GPU Operator and device plugin make that resource available to Kubernetes.
+The deployment has one replica. Version 0.1.0 has one active GPU-serving model release.
+
+## Deployment strategy
+
+Use:
+
+```yaml
+strategy:
+  type: Recreate
+```
+
+A model replacement stops the current vLLM pod before Kubernetes starts the new pod. This keeps the GX10 dedicated to one model load during the transition.
 
 ## Internal service routing
 
 ```mermaid
 flowchart LR
     client["Client"] --> ingress["Ingress\nllm.internal.example"]
-    ingress --> svc_litellm["Service\nlitellm-proxy"]
-    svc_litellm --> pod_litellm["Deployment pods\nlitellm-proxy"]
-    pod_litellm --> svc_vllm["Service\nvllm-company-code"]
-    svc_vllm --> pod_vllm["Deployment pod\nvllm-company-code"]
-    pod_vllm --> gx10["ASUS Ascent GX10\nNVIDIA GB10"]
+    ingress --> litellmSvc["Service\nlitellm"]
+    litellmSvc --> litellmPod["LiteLLM pod"]
+    litellmPod --> vllmSvc["Service\nvllm"]
+    vllmSvc --> vllmPod["vLLM pod"]
+    vllmPod --> gx10["ASUS Ascent GX10\nNVIDIA GB10"]
 ```
 
-Internal vLLM service name example:
-
-```text
-http://vllm-company-code.llm-prod.svc.cluster.local:8000/v1
-```
-
-Clients should call:
+Clients call:
 
 ```text
 https://llm.internal.example/v1/chat/completions
 ```
 
-not the vLLM service directly.
+Only LiteLLM calls the private vLLM Service. The vLLM Service has no external ingress route.
+
+## Model cache
+
+The model cache persists outside the vLLM pod so a redeploy does not require a fresh model download. The chart refers to the existing PVC and mounts it at the vLLM download directory.
+
+The persistent cache does not make a model release active. The active release remains the model definition committed in the Helm values.
+
+## GitOps ownership
+
+Argo CD owns the resources rendered by the Helm chart. Manual changes in the namespace are temporary drift and are reconciled back to the Git-defined state.
