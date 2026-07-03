@@ -39,7 +39,7 @@ Limit:
 - Teams
 - Service accounts
 - Coding agents
-- Jenkins jobs
+- GitLab CI jobs
 - Bots
 - Backend services
 
@@ -58,7 +58,7 @@ Coding agent:
   max 100K tokens per task
   stop after N failed attempts
 
-Jenkins benchmark:
+GitLab CI benchmark:
   staging only
   fixed benchmark budget
   no production model access
@@ -82,7 +82,7 @@ Human users should authenticate through SSO when possible.
 
 Non-human workloads need service identities:
 
-- Jenkins jobs
+- GitLab CI jobs
 - Coding agents
 - Slack/Teams bots
 - Internal backend services
@@ -140,7 +140,7 @@ Recommended storage:
 - Kubernetes Secrets, ideally synced from external secret management
 - External Secrets Operator
 - Sealed Secrets
-- Jenkins credentials for Jenkins-only keys
+- GitLab CI variables for GitLab CI-only keys
 
 For on-prem environments, a practical setup is:
 
