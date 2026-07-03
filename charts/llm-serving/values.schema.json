@@ -33,9 +33,14 @@
         "resources": {"type": "object"},
         "modelCache": {
           "type": "object",
-          "required": ["existingClaim", "mountPath"],
+          "required": ["create", "claimName", "existingClaim", "accessModes", "size", "mountPath"],
           "properties": {
-            "existingClaim": {"type": "string", "minLength": 1},
+            "create": {"type": "boolean"},
+            "claimName": {"type": "string", "minLength": 1},
+            "existingClaim": {"type": "string"},
+            "accessModes": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+            "size": {"type": "string", "minLength": 1},
+            "storageClassName": {"type": "string"},
             "mountPath": {"type": "string", "minLength": 1}
           }
         },
