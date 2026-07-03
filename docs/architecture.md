@@ -1,18 +1,23 @@
 # Architecture
 
-## Goal
+## v0.1.0 goal
 
-Provide an internal LLM platform for chat, coding assistance, and service-to-service AI workloads using an ASUS Ascent GX10 with the NVIDIA GB10 Grace Blackwell platform.
+Provide an internal LLM platform for chat, coding assistance, and service-to-service AI workloads on one ASUS Ascent GX10 with the NVIDIA GB10 Grace Blackwell platform.
 
-The core requirements:
+The platform uses one active GPU-serving base model at a time. A model change is a GitOps release change, with a planned service interruption while the new model loads.
 
-- One stable internal API endpoint
+## Core requirements
+
+- One stable internal OpenAI-compatible API endpoint
 - Human and non-human access
-- Quotas and rate limits
-- Production and staging separation
-- Model benchmarking before promotion
-- Observability across gateway, serving, Kubernetes, and GPU layers
-- Minimal custom code in the inference path
+- API keys, quotas, rate limits, and usage tracking
+- One Kubernetes namespace: `llm-serving`
+- One GPU-backed vLLM Deployment with one active model release
+- Helm as the application definition
+- Git as the desired-state source of truth
+- Argo CD as the Kubernetes reconciler
+- Existing on-prem GitLab for source control, CI, and image registry
+- Basic observability across LiteLLM, vLLM, Kubernetes, and the GX10
 
 ## Main request flow
 
@@ -21,146 +26,81 @@ sequenceDiagram
     autonumber
     participant User as User / Tool / Agent
     participant Ingress as Internal Ingress
-    participant Gateway as LiteLLM Gateway
-    participant VLLM as vLLM Model Server
+    participant Gateway as LiteLLM
+    participant VLLM as vLLM
     participant GX10 as ASUS Ascent GX10
-    participant Obs as Observability Stack
+    participant Obs as Observability
 
     User->>Ingress: POST /v1/chat/completions
     Ingress->>Gateway: Forward request
-    Gateway->>Gateway: Auth, quota, model alias routing
+    Gateway->>Gateway: Auth, quota, company-code routing
     Gateway->>VLLM: Forward OpenAI-compatible request
     VLLM->>GX10: Run inference
     GX10-->>VLLM: Generated tokens
     VLLM-->>Gateway: Stream response
     Gateway-->>User: Stream response
-    Gateway-->>Obs: Metrics, logs, trace metadata
-    VLLM-->>Obs: Inference metrics, logs
+    Gateway-->>Obs: Gateway metrics
+    VLLM-->>Obs: Inference metrics
+```
+
+## Delivery flow
+
+```mermaid
+flowchart LR
+    git["Existing GitLab\nChart, values, source code"] --> ci["GitLab CI\nValidate and build when needed"]
+    ci --> merge["Approved Git revision"]
+    merge --> argo["Argo CD\nRender Helm and reconcile"]
+    argo --> k8s["Kubernetes\nllm-serving"]
+    k8s --> litellm["LiteLLM"]
+    k8s --> vllm["One active vLLM release"]
 ```
 
 ## Component responsibilities
 
 ### LiteLLM
 
-LiteLLM is the platform gateway.
-
-It owns:
-
-- API surface exposed to users and tools
-- Authentication integration
-- API key validation
-- User, team, and service identity mapping
-- Request limits
-- Token limits
-- Model aliases
-- Routing to backend model servers
-- Usage accounting
-- Quota rejection
-- Basic request metadata
-
-LiteLLM should be the public internal endpoint. Clients should not call vLLM directly.
+LiteLLM is the stable public internal gateway. It provides API keys, identity mapping, quotas, usage accounting, and a stable `company-code` model alias.
 
 ### vLLM
 
-vLLM is the model-serving backend.
+vLLM loads and serves the active model release on the GX10. The Helm values define the exact model, revision, quantization, context limit, concurrency settings, runtime image, and reviewed additional arguments.
 
-It owns:
+### Kubernetes and Helm
 
-- Loading model weights
-- Running inference on the GX10
-- Efficient batching
-- Streaming tokens
-- Exposing an OpenAI-compatible backend endpoint
-- Model-side metrics such as queue time, latency, and token throughput
+Kubernetes runs LiteLLM and vLLM in `llm-serving`. The Helm chart defines the workload, Service, ConfigMaps, Secret references, model-cache PVC reference, Ingress, NetworkPolicy, and monitoring integration.
 
-### Kubernetes
+The vLLM Deployment uses `Recreate`, so Kubernetes terminates the previous GPU-serving pod before loading the replacement model.
 
-Kubernetes provides:
+### Argo CD
 
-- Deployment control
-- Namespace separation
-- Service discovery
-- Secret injection
-- Rollouts and rollbacks
-- Resource quotas
-- GPU scheduling
-- Benchmark Jobs and CronJobs
-- Observability integration
+Argo CD tracks the approved Git revision, renders the Helm chart, and reconciles Kubernetes to the desired state.
 
-### GitLab CI/CD
+### Existing GitLab
 
-The existing on-prem GitLab and its existing GitLab Runner infrastructure own the delivery and evaluation pipeline:
-
-```mermaid
-flowchart LR
-    git["GitLab change\nconfig/model/eval"] --> build["Build or validate artifacts"]
-    build --> deploy_staging["Deploy to llm-staging"]
-    deploy_staging --> evals["Run benchmarks and evals"]
-    evals --> compare["Compare to prod baseline"]
-    compare --> approval{"Manual approval?"}
-    approval -->|yes| prod["Promote to llm-prod"]
-    approval -->|no| stop["Keep candidate in staging"]
-```
-
-GitLab stores source code, pipeline records, container images, and deployment artifacts. GitLab Runner executes pipeline jobs for validation, staging deployment, benchmarking, and production promotion.
+GitLab hosts the source and desired state. GitLab CI validates Helm changes and builds immutable images only when custom deployment code changes. It does not apply the application to Kubernetes directly.
 
 ## Endpoint model
 
-Expose stable endpoints:
-
-```text
-Production:
-https://llm.internal.example/v1
-
-Staging:
-https://llm-staging.internal.example/v1
-```
-
-The endpoint stays stable. The model alias changes:
-
-```text
-company-fast
-company-code
-company-large
-company-experimental
-```
-
-## Why not expose one endpoint per model?
-
-Avoid this pattern:
-
-```text
-https://company-code.internal.example
-https://company-fast.internal.example
-https://company-large.internal.example
-```
-
-It creates unnecessary client coupling.
-
-Better:
-
 ```text
 https://llm.internal.example/v1
 ```
 
-and select the model by alias in the request body.
-
-## Why `/chat/completions`?
-
-Modern chat models and agent clients usually use:
-
-```text
-/v1/chat/completions
-```
-
-Support `/v1/completions` only if legacy clients need it.
-
-Minimum version 1 API:
+Minimum API:
 
 - `/v1/chat/completions`
 - `/v1/models`
 
-Optional later:
+Clients select `company-code`. A model release changes the implementation behind that stable alias, rather than changing client configuration.
 
-- `/v1/embeddings`
-- `/v1/completions`
+## Model replacement
+
+```text
+Change reviewed model values in Git
+→ GitLab CI validates the Helm release
+→ merge to the tracked branch
+→ Argo CD synchronizes Kubernetes
+→ the vLLM Deployment recreates with the new model
+→ retain the commit or revert it
+```
+
+The system does not require a parallel always-on staging model for v0.1.0.
