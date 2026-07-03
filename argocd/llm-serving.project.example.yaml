@@ -1,0 +1,22 @@
+# Copy to argocd/llm-serving.project.yaml, replace the repository URL,
+# then apply once before creating the Application.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: llm-serving
+  namespace: argocd
+spec:
+  description: Restricted project for the GX10 llm-serving release
+  sourceRepos:
+    - https://gitlab.example.internal/platform/llm-serving.git
+  destinations:
+    - namespace: llm-serving
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
+  orphanedResources:
+    warn: true
