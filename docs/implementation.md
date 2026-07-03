@@ -13,7 +13,7 @@
 ## Not created here
 
 - Kubernetes or K3s installation
-- NVIDIA GPU Operator
+- GX10 GPU driver, container-runtime, and Kubernetes device-plugin integration
 - Argo CD installation or repository credentials
 - Existing GitLab, runners, or registry credentials
 - Real Secret values
@@ -23,11 +23,12 @@
 
 ## First changes before bootstrap
 
-1. Replace placeholder image digests in `values/gx10.yaml` with tested Arm64 images.
-2. Set the exact model revision and benchmarked vLLM settings.
-3. Set ingress and storage values.
-4. Run `sh scripts/validate-helm.sh`.
-5. Bootstrap the Argo CD Application from its template.
+1. Validate that the GX10 exposes `nvidia.com/gpu: 1` to Kubernetes.
+2. Replace placeholder image digests in `values/gx10.yaml` with tested Arm64 images.
+3. Set the exact model revision and benchmarked vLLM settings.
+4. Set ingress and storage values.
+5. Run `sh scripts/validate-helm.sh`.
+6. Bootstrap the Argo CD Application from its template.
 
 ## Expected release
 
