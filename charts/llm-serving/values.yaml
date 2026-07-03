@@ -90,6 +90,9 @@ vllm:
     maxNumBatchedTokens: 8192
     downloadDir: /models/huggingface
     extraArgs: []
+  huggingFaceToken:
+    secretName: ""
+    secretKey: HF_TOKEN
   modelCache:
     create: true
     claimName: llm-model-cache
