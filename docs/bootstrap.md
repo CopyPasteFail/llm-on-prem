@@ -10,7 +10,7 @@ Before bootstrapping the application, provide these cluster prerequisites outsid
 - NVIDIA GPU Operator installed and the node advertising `nvidia.com/gpu: 1`.
 - An ingress controller and internal DNS/TLS arrangement.
 - Argo CD installed in its own namespace.
-- A storage class and a pre-created `llm-model-cache` PVC in `llm-serving`, sized for model weights and cache.
+- A storage class that can dynamically provision the chart-managed model-cache PVC. Alternatively, set `vllm.modelCache.create: false` and provide an existing claim.
 - Existing GitLab repository access configured in Argo CD.
 - A real secret named `llm-serving-secrets` in `llm-serving`.
 
@@ -20,7 +20,7 @@ Do not bootstrap until a tested Arm64 LiteLLM image, a tested Arm64 vLLM image, 
 
 1. Set the actual model release in `charts/llm-serving/values/gx10.yaml`.
 2. Replace the example image repositories and digests with tested immutable image digests.
-3. Set the exact model repository revision, context limit, memory utilization, concurrency, and any reviewed vLLM flags.
+3. Set the exact model repository revision, context limit, memory utilization, concurrency, cache size, and any reviewed vLLM flags.
 4. Set the internal ingress hostname and, where needed, ingress class and TLS settings.
 5. Commit the reviewed desired state to the branch Argo CD will track.
 
@@ -61,8 +61,8 @@ After the Application exists, normal application changes are Git changes only. A
 After the intentional first sync:
 
 ```bash
-kubectl -n llm-serving get pods,svc,ingress
-kubectl -n llm-serving get deployment llm-serving-llm-serving-vllm
+kubectl -n llm-serving get pods,svc,ingress,pvc
+kubectl -n llm-serving get deployment llm-serving-vllm
 ./scripts/smoke-api.sh
 ```
 
