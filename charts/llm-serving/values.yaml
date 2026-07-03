@@ -44,6 +44,14 @@ litellm:
     limits:
       cpu: "1"
       memory: "2Gi"
+  probes:
+    readiness:
+      periodSeconds: 10
+      failureThreshold: 6
+    liveness:
+      initialDelaySeconds: 15
+      periodSeconds: 20
+      failureThreshold: 3
   existingSecret:
     name: llm-serving-secrets
     masterKeyKey: LITELLM_MASTER_KEY
