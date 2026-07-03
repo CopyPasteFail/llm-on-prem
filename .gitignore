@@ -1,9 +1,5 @@
-# Operator-specific desired state and bootstrap material
-charts/llm-serving/values/gx10.yaml
-argocd/llm-serving.application.yaml
+# Bootstrap-local material and credentials
 bootstrap/
-
-# Secrets and local environment files
 .env
 .env.*
 *.key
