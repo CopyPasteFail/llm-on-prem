@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "llm-serving.fullname" . }}-litellm
+  namespace: {{ include "llm-serving.namespace" . }}
+  labels:
+    {{- include "llm-serving.labels" . | nindent 4 }}
+    app.kubernetes.io/component: litellm
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.litellm.port }}
+      targetPort: http
+      protocol: TCP
+  selector:
+    {{- include "llm-serving.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: litellm
