@@ -1,0 +1,19 @@
+{{- if .Values.vllm.modelCache.create }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Values.vllm.modelCache.claimName }}
+  namespace: {{ include "llm-serving.namespace" . }}
+  labels:
+    {{- include "llm-serving.labels" . | nindent 4 }}
+    app.kubernetes.io/component: vllm
+spec:
+  accessModes:
+    {{- toYaml .Values.vllm.modelCache.accessModes | nindent 4 }}
+  resources:
+    requests:
+      storage: {{ .Values.vllm.modelCache.size }}
+  {{- with .Values.vllm.modelCache.storageClassName }}
+  storageClassName: {{ . }}
+  {{- end }}
+{{- end }}
