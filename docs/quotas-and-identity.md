@@ -1,171 +1,52 @@
 # Quotas and Identity
 
-## Request vs token
+## v0.1.0 implemented scope
 
-A request is one API call.
+Version 0.1.0 runs LiteLLM without a database and exposes one stable model alias, `company-code`.
 
-A token is a chunk of input or output text processed by the model.
-
-Example:
+The implemented authentication boundary is one gateway key:
 
 ```text
-One API call with:
-- 8,000 input tokens
-- 1,000 output tokens
-
-Result:
-- 1 request
-- 9,000 total tokens
+Client
+  -> Authorization: Bearer LITELLM_MASTER_KEY
+  -> LiteLLM
+  -> private vLLM service
 ```
 
-Request limits and token limits protect different things.
+This is suitable for a small trusted internal pilot. It is not per-user identity, per-service identity, SSO, persistent usage accounting, virtual-key management, or quota enforcement.
 
-| Limit type | Protects against |
-|---|---|
-| Requests per minute | Too many calls, API overload, noisy clients |
-| Tokens per minute | Heavy prompts, long generations, GPU pressure |
-| Tokens per day/month | Budget exhaustion and unfair usage |
-| Concurrent requests | Agent loops and overloaded model servers |
-| Max context size | Huge prompts that hurt latency and memory |
-| Max output tokens | Long uncontrolled generations |
+## What v0.1.0 does provide
 
-## Every identity needs limits
+- A gateway key protects the LiteLLM API.
+- vLLM is private to the namespace and receives traffic only from LiteLLM.
+- The stable `company-code` alias avoids client changes during model replacement.
+- vLLM context, batching, and concurrent-sequence limits protect the single GX10 from unbounded model settings.
 
-Do not limit only human users.
+## What v0.1.0 does not provide
 
-Limit:
+- Individual human identities.
+- SSO or OIDC login.
+- Separate service keys.
+- Per-user, per-team, or per-service quotas.
+- Persistent usage, spend, or audit accounting.
+- Self-service key creation.
+- Multiple model-access tiers.
 
-- Human users
-- Teams
-- Service accounts
-- Coding agents
-- GitLab CI jobs
-- Bots
-- Backend services
+Do not describe the initial master key as a personal key. Store it in the approved secret-management system and distribute it only to the limited pilot clients that need access.
 
-Coding agents and CI jobs often need larger budgets than humans, but stricter guardrails.
+## Security rule
 
-Example:
+Never commit `LITELLM_MASTER_KEY` or `VLLM_API_KEY`. The chart references the pre-existing `llm-serving-secrets` Secret; it does not create populated secrets.
 
-```text
-Human user:
-  60 requests/minute
-  200K tokens/day
+## Future identity and quota phase
 
-Coding agent:
-  10 concurrent runs
-  2M tokens/day
-  max 100K tokens per task
-  stop after N failed attempts
+Add a separate, reviewed phase when the service needs multiple users or services with independent access policy. That phase should include:
 
-GitLab CI benchmark:
-  staging only
-  fixed benchmark budget
-  no production model access
-```
+1. A managed PostgreSQL database or another supported persistence path for LiteLLM.
+2. A gateway identity design: SSO/OIDC for people and service identities for automation.
+3. Per-client LiteLLM virtual keys with model access, expiry, rate, concurrency, and token limits.
+4. Usage/audit retention policy and dashboarding.
+5. Key issuance, rotation, revocation, and approval workflow.
+6. Migration away from the shared pilot master key.
 
-## Why use API keys if SSO already exists?
-
-Use both.
-
-```mermaid
-flowchart TB
-    sso["Company SSO\nHuman identity"] --> litellm["LiteLLM"]
-    keys["Service API keys\nNon-human identity"] --> litellm
-
-    litellm --> users["User quota"]
-    litellm --> teams["Team quota"]
-    litellm --> services["Service quota"]
-```
-
-Human users should authenticate through SSO when possible.
-
-Non-human workloads need service identities:
-
-- GitLab CI jobs
-- Coding agents
-- Slack/Teams bots
-- Internal backend services
-- Scheduled summarization jobs
-- Benchmark runners
-
-Do not run these under a random engineer's personal account.
-
-## Service key ownership
-
-Each service API key should have:
-
-- Owning team
-- Owning person or group
-- Environment: production or staging
-- Allowed model aliases
-- Token budget
-- Request limits
-- Concurrency limits
-- Expiration or rotation policy
-- Audit trail
-
-Example:
-
-```text
-Key name:
-engineering-coding-agent-prod
-
-Owner:
-Engineering Productivity
-
-Environment:
-production
-
-Allowed models:
-company-code, company-fast
-
-Denied models:
-company-experimental
-
-Budget:
-5M tokens/day
-
-Rotation:
-90 days
-```
-
-## Where keys live
-
-Keys should not be committed to Git.
-
-Recommended storage:
-
-- HashiCorp Vault
-- Kubernetes Secrets, ideally synced from external secret management
-- External Secrets Operator
-- Sealed Secrets
-- GitLab CI variables for GitLab CI-only keys
-
-For on-prem environments, a practical setup is:
-
-```text
-Vault
-  -> External Secrets Operator
-  -> Kubernetes Secret
-  -> Pod environment variable or mounted secret
-```
-
-## Who creates keys?
-
-The platform team owns key creation and policy.
-
-Team owners request keys for specific services.
-
-A simple process:
-
-```mermaid
-flowchart LR
-    team["Team requests service key"] --> approval["Platform approval"]
-    approval --> create["Create LiteLLM key"]
-    create --> vault["Store in Vault"]
-    vault --> k8s["Sync to Kubernetes Secret"]
-    k8s --> workload["Inject into workload"]
-```
-
-A mature process can use an internal portal, but the first version can use a ticket-based process.
+Until that phase exists, the operational boundary is a trusted internal pilot with one shared gateway credential and one model alias.
