@@ -1,0 +1,25 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "llm-serving.fullname" . }}-vllm
+  namespace: {{ include "llm-serving.namespace" . }}
+  labels:
+    {{- include "llm-serving.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "llm-serving.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: vllm
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "llm-serving.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: litellm
+      ports:
+        - protocol: TCP
+          port: {{ .Values.vllm.port }}
+{{- end }}
