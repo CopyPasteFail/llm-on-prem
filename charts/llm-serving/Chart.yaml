@@ -1,0 +1,15 @@
+apiVersion: v2
+name: llm-serving
+description: GitOps deployment for one active vLLM model on an ASUS Ascent GX10
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">=1.29.0-0"
+keywords:
+  - llm
+  - vllm
+  - litellm
+  - gx10
+  - gitops
+maintainers:
+  - name: Platform Team
