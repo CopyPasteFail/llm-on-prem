@@ -91,6 +91,17 @@ vllm:
     size: 500Gi
     storageClassName: ""
     mountPath: /models
+  probes:
+    startup:
+      periodSeconds: 10
+      failureThreshold: 90
+    readiness:
+      periodSeconds: 15
+      failureThreshold: 20
+    liveness:
+      initialDelaySeconds: 60
+      periodSeconds: 30
+      failureThreshold: 6
   deployment:
     strategy: Recreate
   nodeSelector: {}
