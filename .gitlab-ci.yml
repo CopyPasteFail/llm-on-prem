@@ -1,0 +1,41 @@
+# Validation only. Argo CD is the sole application deployer.
+# This file does not build images, deploy to Kubernetes, or require cluster credentials.
+
+stages:
+  - validate
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - when: never
+
+variables:
+  CHART_DIR: charts/llm-serving
+  EXAMPLE_VALUES: charts/llm-serving/values/gx10.example.yaml
+
+helm_validate:
+  stage: validate
+  image: alpine/helm:3.17.3
+  interruptible: true
+  script:
+    - helm lint "$CHART_DIR" --values "$EXAMPLE_VALUES"
+    - mkdir -p rendered
+    - helm template llm-serving "$CHART_DIR" --namespace llm-serving --values "$EXAMPLE_VALUES" > rendered/llm-serving.yaml
+    - test -s rendered/llm-serving.yaml
+  artifacts:
+    when: always
+    expire_in: 7 days
+    paths:
+      - rendered/llm-serving.yaml
+  rules:
+    - changes:
+        - .gitlab-ci.yml
+        - charts/**/*
+        - argocd/**/*
+        - scripts/**/*
+        - docs/**/*
+
+# Future image-build jobs belong in a separate stage only when this repository
+# contains custom deployment code. Such jobs must publish an immutable digest
+# and update desired state in Git. They must not deploy directly to Kubernetes.
