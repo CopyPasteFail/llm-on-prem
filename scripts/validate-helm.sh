@@ -17,6 +17,7 @@ test -f "$values_file" || {
   exit 1
 }
 
+sh scripts/check-gitops-layout.sh
 mkdir -p "$output_dir"
 helm lint "$chart_dir" --values "$values_file"
 helm template llm-serving "$chart_dir" \
