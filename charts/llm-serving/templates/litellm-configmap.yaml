@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "llm-serving.fullname" . }}-litellm-config
+  namespace: {{ include "llm-serving.namespace" . }}
+  labels:
+    {{- include "llm-serving.labels" . | nindent 4 }}
+    app.kubernetes.io/component: litellm
+data:
+  config.yaml: |
+    model_list:
+      - model_name: {{ .Values.litellm.servedModelName | quote }}
+        litellm_params:
+          model: {{ printf "openai/%s" .Values.litellm.servedModelName | quote }}
+          api_base: {{ printf "http://%s-vllm:%v/v1" (include "llm-serving.fullname" .) .Values.vllm.port | quote }}
+          api_key: "os.environ/VLLM_API_KEY"
+    general_settings:
+      master_key: "os.environ/LITELLM_MASTER_KEY"
+{{- if .Values.litellm.database.enabled }}
+      database_url: "os.environ/DATABASE_URL"
+{{- end }}
