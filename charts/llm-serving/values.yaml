@@ -1,0 +1,115 @@
+# Safe chart defaults. Copy values/gx10.example.yaml to the ignored
+# values/gx10.yaml and replace every REPLACE_* value before deployment.
+
+nameOverride: ""
+fullnameOverride: ""
+namespaceOverride: ""
+
+imagePullSecrets: []
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+  automountServiceAccountToken: false
+
+podSecurityContext:
+  fsGroup: 1000
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+
+litellm:
+  image:
+    repository: REPLACE_WITH_TESTED_ARM64_LITELLM_IMAGE
+    digest: REPLACE_WITH_IMMUTABLE_DIGEST
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  port: 4000
+  servedModelName: company-code
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "1"
+      memory: "2Gi"
+  existingSecret:
+    name: llm-serving-secrets
+    masterKeyKey: LITELLM_MASTER_KEY
+    vllmApiKeyKey: VLLM_API_KEY
+  database:
+    enabled: false
+    urlKey: DATABASE_URL
+
+vllm:
+  image:
+    repository: REPLACE_WITH_TESTED_ARM64_VLLM_IMAGE
+    digest: REPLACE_WITH_IMMUTABLE_DIGEST
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  port: 8000
+  serviceName: vllm
+  resources:
+    requests:
+      cpu: "2"
+      memory: "8Gi"
+    limits:
+      cpu: "8"
+      memory: "32Gi"
+      nvidia.com/gpu: 1
+  model:
+    id: REPLACE_WITH_MODEL_ID
+    revision: REPLACE_WITH_IMMUTABLE_MODEL_REVISION
+    tokenizer: ""
+    tokenizerRevision: ""
+    dtype: auto
+    quantization: ""
+    trustRemoteCode: false
+    maxModelLen: 32768
+    gpuMemoryUtilization: 0.80
+    maxNumSeqs: 16
+    maxNumBatchedTokens: 8192
+    downloadDir: /models/huggingface
+    extraArgs: []
+  modelCache:
+    existingClaim: llm-model-cache
+    mountPath: /models
+  deployment:
+    strategy: Recreate
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+service:
+  type: ClusterIP
+
+networkPolicy:
+  enabled: true
+
+ingress:
+  enabled: true
+  className: ""
+  annotations: {}
+  host: llm.internal.example
+  tls:
+    enabled: false
+    secretName: ""
+
+monitoring:
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+    labels: {}
+
+podAnnotations: {}
