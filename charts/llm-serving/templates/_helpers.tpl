@@ -34,3 +34,11 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- define "llm-serving.namespace" -}}
 {{- default .Release.Namespace .Values.namespaceOverride }}
 {{- end }}
+
+{{- define "llm-serving.modelCacheClaimName" -}}
+{{- if .Values.vllm.modelCache.create }}
+{{- .Values.vllm.modelCache.claimName }}
+{{- else }}
+{{- required "vllm.modelCache.existingClaim is required when modelCache.create is false" .Values.vllm.modelCache.existingClaim }}
+{{- end }}
+{{- end }}
