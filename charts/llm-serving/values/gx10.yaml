@@ -1,0 +1,34 @@
+# Tracked desired state for the GX10 release.
+# Replace the example image digests and model revision in a reviewed Git change
+# before bootstrapping the Argo CD Application.
+
+litellm:
+  image:
+    repository: registry.example.internal/llm/litellm
+    digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  servedModelName: company-code
+  existingSecret:
+    name: llm-serving-secrets
+    masterKeyKey: LITELLM_MASTER_KEY
+    vllmApiKeyKey: VLLM_API_KEY
+
+vllm:
+  image:
+    repository: registry.example.internal/llm/vllm
+    digest: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  model:
+    id: Qwen/Qwen3-0.6B
+    revision: 0123456789abcdef0123456789abcdef01234567
+    dtype: auto
+    quantization: ""
+    trustRemoteCode: false
+    maxModelLen: 8192
+    gpuMemoryUtilization: 0.80
+    maxNumSeqs: 8
+    maxNumBatchedTokens: 4096
+    extraArgs: []
+
+# Keep this hostname private to the corporate network or VPN.
+ingress:
+  host: llm.internal.example
+  className: ""
