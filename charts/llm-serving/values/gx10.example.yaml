@@ -1,0 +1,37 @@
+# Copy to values/gx10.yaml, which is ignored by Git, then replace all example values.
+# The image references are syntactically valid examples only. Use images that you have
+# verified on the GX10's Arm64 environment and pin the exact immutable digest.
+
+litellm:
+  image:
+    repository: registry.example.internal/llm/litellm
+    digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  servedModelName: company-code
+
+vllm:
+  image:
+    repository: registry.example.internal/llm/vllm
+    digest: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  model:
+    id: Qwen/Qwen3-0.6B
+    revision: 0123456789abcdef0123456789abcdef01234567
+    dtype: auto
+    quantization: ""
+    trustRemoteCode: false
+    maxModelLen: 8192
+    gpuMemoryUtilization: 0.80
+    maxNumSeqs: 8
+    maxNumBatchedTokens: 4096
+    extraArgs: []
+
+# Keep this hostname private to the corporate network or VPN.
+ingress:
+  host: llm.internal.example
+  className: ""
+
+# The referenced Secret is created outside Git.
+litellm:
+  existingSecret:
+    name: llm-serving-secrets
+    masterKeyKey: LITELLM_MASTER_KEY
+    vllmApiKeyKey: VLLM_API_KEY
