@@ -29,6 +29,8 @@ require_text charts/llm-serving/values/gx10.yaml 'trustRemoteCode: false' 'trust
 require_text argocd/llm-serving.application.example.yaml 'project: llm-serving' 'the dedicated Argo CD project'
 require_text argocd/llm-serving.application.example.yaml 'prune: false' 'pruning disabled for v0.1.0'
 require_text argocd/llm-serving.project.example.yaml 'namespace: llm-serving' 'the restricted destination namespace'
+require_text argocd/llm-serving.project.example.yaml 'kind: Secret' 'the Argo Secret deny rule'
+require_text argocd/llm-serving.project.example.yaml 'kind: RoleBinding' 'the Argo RBAC deny rule'
 
 if grep -Eq 'LITELLM_MASTER_KEY: [^R]|VLLM_API_KEY: [^R]' examples/llm-serving-secrets.example.yaml; then
   echo "ERROR: the example Secret appears to contain a populated credential." >&2
