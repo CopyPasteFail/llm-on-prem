@@ -8,7 +8,7 @@ Use one namespace:
 llm-serving
 ```
 
-The namespace contains the application release for one GX10 and one active model. The NVIDIA GPU Operator, Argo CD, ingress controller, and cluster-level monitoring are platform prerequisites outside this application namespace.
+The namespace contains the application release for one GX10 and one active model. Argo CD, ingress, cluster-level monitoring, and the validated GX10 GPU enablement path are platform prerequisites outside this application namespace.
 
 ## Application objects
 
@@ -17,7 +17,7 @@ flowchart TB
     ns["llm-serving namespace"] --> ingress["Ingress\nllm.internal.example"]
     ns --> litellm["LiteLLM Deployment and Service"]
     ns --> vllm["vLLM Deployment and Service\nOne active model"]
-    ns --> cache["Existing model-cache PVC"]
+    ns --> cache["Model-cache PVC"]
     ns --> config["ConfigMaps and Secret references"]
     ns --> policy["NetworkPolicy"]
     ns --> monitor["Monitoring integration"]
@@ -33,13 +33,13 @@ The Helm chart renders:
 - LiteLLM `Deployment` and `Service`
 - vLLM `Deployment` and private `Service`
 - internal `Ingress`
-- LiteLLM and vLLM `ConfigMaps`
+- LiteLLM `ConfigMap`
 - references to pre-created secrets
-- model-cache `PersistentVolumeClaim` reference
+- model-cache `PersistentVolumeClaim` by default, or an existing claim when configured
 - `NetworkPolicy`
-- `ServiceAccount`, `Role`, and `RoleBinding` where needed
+- `ServiceAccount`
 - resource requests and limits
-- monitoring annotations or `ServiceMonitor` when available
+- optional `ServiceMonitor`
 
 ## GPU scheduling
 
@@ -50,6 +50,8 @@ resources:
   limits:
     nvidia.com/gpu: 1
 ```
+
+The chart does not choose or install the mechanism that exposes this resource. Before deployment, validate the GX10 driver, container runtime, Kubernetes GPU device-plugin path, and a test pod that can request `nvidia.com/gpu: 1`.
 
 The deployment has one replica. Version 0.1.0 has one active GPU-serving model release.
 
@@ -86,7 +88,7 @@ Only LiteLLM calls the private vLLM Service. The vLLM Service has no external in
 
 ## Model cache
 
-The model cache persists outside the vLLM pod so a redeploy does not require a fresh model download. The chart refers to the existing PVC and mounts it at the vLLM download directory.
+The model cache persists outside the vLLM pod so a redeploy does not require a fresh model download. The chart creates the PVC by default and mounts it at the vLLM download directory. It can instead mount an existing claim through values.
 
 The persistent cache does not make a model release active. The active release remains the model definition committed in the Helm values.
 
