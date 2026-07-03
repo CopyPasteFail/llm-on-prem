@@ -1,6 +1,3 @@
-# Validation only. Argo CD is the sole application deployer.
-# This file does not build images, deploy to Kubernetes, or require cluster credentials.
-
 stages:
   - validate
 
@@ -16,7 +13,9 @@ variables:
 
 helm_validate:
   stage: validate
-  image: alpine/helm:3.17.3
+  image:
+    name: alpine/helm:3.17.3
+    entrypoint: [""]
   interruptible: true
   script:
     - helm lint "$CHART_DIR" --values "$GX10_VALUES"
@@ -36,6 +35,4 @@ helm_validate:
         - scripts/**/*
         - docs/**/*
 
-# Future image-build jobs belong in a separate stage only when this repository
-# contains custom deployment code. Such jobs must publish an immutable digest
-# and update desired state in Git. They must not deploy directly to Kubernetes.
+# Validation only: this repository has no direct Kubernetes deployment job.
